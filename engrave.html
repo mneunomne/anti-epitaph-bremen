@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>engraving desk — anti-epigraph</title>
+	<link rel="icon"
+		href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%231c1a18'/><rect x='2' y='5' width='12' height='6' fill='%23c07a52'/></svg>">
+	<link rel="stylesheet" href="css/dashboard.css">
+</head>
+
+<body>
+	<header class="bar">
+		<div class="brand">
+			<strong>engraving desk</strong>
+			<a href="index.html">the piece →</a>
+		</div>
+
+		<div class="proj">
+			<select id="projectSel" title="project"></select>
+			<button id="newProj" title="new project">new</button>
+			<button id="renameProj" title="rename">rename</button>
+			<button id="dupProj" title="duplicate">copy</button>
+			<button id="delProj" class="danger" title="delete">del</button>
+		</div>
+
+		<div class="grow"></div>
+
+		<div class="progress" id="progressWrap">
+			<div class="bar-track"><div class="bar-fill" id="progressFill"></div></div>
+			<span id="progressText">—</span>
+		</div>
+
+		<select id="exportScope" title="what goes in the zip">
+			<option value="all">every brick</option>
+			<option value="todo">only what is not engraved</option>
+			<option value="queued">only the queued</option>
+			<option value="one">only the selected brick</option>
+		</select>
+		<label class="check" title="include a ready-to-send .gc per brick"><input type="checkbox" id="withGcode"
+				checked> gcode</label>
+		<button id="exportBtn" class="primary">export zip</button>
+	</header>
+
+	<main class="layout">
+		<!-- ---------------- controls ---------------- -->
+		<aside class="col controls">
+			<section>
+				<h2>brick</h2>
+				<label>format
+					<select id="preset"></select>
+				</label>
+				<div class="triple">
+					<label>length <input type="number" id="bLength" min="10" step="1"><i>mm</i></label>
+					<label>width <input type="number" id="bWidth" min="10" step="1"><i>mm</i></label>
+					<label>height <input type="number" id="bHeight" min="10" step="1"><i>mm</i></label>
+				</div>
+				<label>face engraved
+					<select id="face"></select>
+				</label>
+				<p class="hint" id="faceHint">—</p>
+			</section>
+
+			<section>
+				<h2>wall</h2>
+				<div class="pair">
+					<label>bricks across <input type="number" id="cols" min="1" max="200" step="1"></label>
+					<label>courses <input type="number" id="rows" min="1" max="200" step="1"></label>
+				</div>
+				<div class="pair">
+					<label>joint ↔ <input type="number" id="gapX" min="0" step="0.5"><i>mm</i></label>
+					<label>joint ↕ <input type="number" id="gapY" min="0" step="0.5"><i>mm</i></label>
+				</div>
+				<button id="fitRows" class="wide">fit courses to the image</button>
+				<label>fit
+					<select id="fit">
+						<option value="cover">cover — crop the overflow</option>
+						<option value="contain">contain — keep it whole</option>
+						<option value="stretch">stretch — distort to fill</option>
+					</select>
+				</label>
+				<label>shift ↔ <input type="range" id="offsetX" min="-100" max="100" value="0"></label>
+				<label>shift ↕ <input type="range" id="offsetY" min="-100" max="100" value="0"></label>
+				<label>course R01 sits
+					<select id="originRow">
+						<option value="bottom">at the bottom (laid first)</option>
+						<option value="top">at the top (read first)</option>
+					</select>
+				</label>
+			</section>
+
+			<section>
+				<h2>source</h2>
+				<div class="drop" id="drop">
+					<input type="file" id="file" accept="image/*" hidden>
+					<button id="pickFile" class="wide">choose an image…</button>
+					<p class="hint">or drop one here</p>
+				</div>
+				<div id="bundled"></div>
+				<p class="hint" id="imgHint">no image loaded</p>
+			</section>
+
+			<section>
+				<h2>laser</h2>
+				<label>resolution
+					<select id="dpi">
+						<option value="127">127 dpi — 0.20 mm</option>
+						<option value="169">169 dpi — 0.15 mm</option>
+						<option value="254">254 dpi — 0.10 mm</option>
+						<option value="318">318 dpi — 0.08 mm</option>
+						<option value="508">508 dpi — 0.05 mm</option>
+					</select>
+				</label>
+				<label>mode
+					<select id="mode">
+						<option value="grayscale">grayscale — power follows tone</option>
+						<option value="dither">dither — floyd–steinberg 1-bit</option>
+						<option value="threshold">threshold — hard black / white</option>
+					</select>
+				</label>
+				<label class="thresholdOnly">cut at <input type="range" id="threshold" min="1" max="254">
+					<output id="thresholdV"></output>
+				</label>
+				<label>brightness <input type="range" id="brightness" min="-100" max="100">
+					<output id="brightnessV"></output>
+				</label>
+				<label>contrast <input type="range" id="contrast" min="0" max="300">
+					<output id="contrastV"></output>
+				</label>
+				<label>gamma <input type="range" id="gamma" min="20" max="300">
+					<output id="gammaV"></output>
+				</label>
+				<label class="check"><input type="checkbox" id="invert"> invert (burn the light tones)</label>
+				<label>bleed <input type="number" id="bleed" min="0" max="20" step="0.5"><i>mm past the edge</i></label>
+				<button id="resetLaser" class="wide">reset the levels</button>
+			</section>
+
+			<section>
+				<h2>machine</h2>
+				<div class="pair">
+					<label>speed <input type="number" id="gcFeed" min="1" max="60000" step="100"><i>mm/min</i></label>
+					<label>power <input type="number" id="gcPower" min="0" max="100" step="0.5"><i>%</i></label>
+				</div>
+				<label>laser mode
+					<select id="gcLaserMode">
+						<option value="M3">M3 — constant power</option>
+						<option value="M4">M4 — dynamic, power tracks speed</option>
+					</select>
+				</label>
+				<div class="pair">
+					<label>S at full <input type="number" id="gcSMax" min="1" max="10000" step="1"><i>grbl $30</i></label>
+					<label>passes <input type="number" id="gcPasses" min="1" max="20" step="1"></label>
+				</div>
+				<label class="check"><input type="checkbox" id="gcBidir"> scan both directions</label>
+				<label>overscan <input type="number" id="gcOverscan" min="0" max="30" step="0.5"><i>mm run-up</i></label>
+				<div class="pair">
+					<label>origin ↔ <input type="number" id="gcOriginX" step="0.5"><i>mm</i></label>
+					<label>origin ↕ <input type="number" id="gcOriginY" step="0.5"><i>mm</i></label>
+				</div>
+				<label class="check"><input type="checkbox" id="gcAir"> air assist (M8 / M9)</label>
+				<p class="hint" id="gcHint">—</p>
+			</section>
+
+			<section>
+				<h2>simulation</h2>
+				<label>the burn reads
+					<select id="polarity">
+						<option value="darker">darker — soot and char</option>
+						<option value="lighter">lighter — cut back to the body</option>
+					</select>
+				</label>
+				<p class="hint">test one brick before you commit to a wall.</p>
+			</section>
+
+			<section>
+				<h2>backup</h2>
+				<button id="exportJson" class="wide">save project as .json</button>
+				<button id="importJson" class="wide">load a project .json…</button>
+				<input type="file" id="jsonFile" accept="application/json,.json" hidden>
+			</section>
+		</aside>
+
+		<!-- ---------------- stage ---------------- -->
+		<section class="col stage">
+			<div class="stage-tools">
+				<div class="views" id="views">
+					<button data-view="simulation" class="on">simulation</button>
+					<button data-view="laser">what burns</button>
+					<button data-view="source">source</button>
+					<button data-view="status">status</button>
+				</div>
+				<div class="grow"></div>
+				<label class="check"><input type="checkbox" id="showLabels" checked> labels</label>
+				<label class="check"><input type="checkbox" id="showGrid" checked> joints</label>
+			</div>
+
+			<div class="canvas-wrap" id="canvasWrap">
+				<canvas id="stage"></canvas>
+			</div>
+
+			<div class="stage-foot" id="stageFoot">—</div>
+		</section>
+
+		<!-- ---------------- record ---------------- -->
+		<aside class="col side">
+			<section id="inspector">
+				<h2>brick <span id="inspLabel">—</span></h2>
+				<div class="insp-body" id="inspBody">
+					<p class="hint">click a brick on the wall.</p>
+				</div>
+			</section>
+
+			<section>
+				<h2>tally</h2>
+				<div id="tally" class="tally"></div>
+				<div class="bulk">
+					<button data-bulk="engraved">mark all engraved</button>
+					<button data-bulk="pending">reset all to pending</button>
+				</div>
+			</section>
+
+			<section>
+				<h2>log</h2>
+				<div id="logList" class="log"></div>
+			</section>
+		</aside>
+	</main>
+
+	<!-- ---------------- ledger ---------------- -->
+	<section class="ledger">
+		<div class="ledger-head">
+			<h2>ledger</h2>
+			<input type="search" id="ledgerSearch" placeholder="filter by label or note…">
+			<select id="ledgerStatus">
+				<option value="">every status</option>
+			</select>
+			<div class="grow"></div>
+			<button id="exportCsv">export csv</button>
+		</div>
+		<div class="table-wrap">
+			<table id="ledger">
+				<thead>
+					<tr>
+						<th>brick</th>
+						<th>course</th>
+						<th>pos</th>
+						<th>status</th>
+						<th>engraved</th>
+						<th>operator</th>
+						<th>passes</th>
+						<th>notes</th>
+					</tr>
+				</thead>
+				<tbody></tbody>
+			</table>
+		</div>
+	</section>
+
+	<div id="toast" class="toast"></div>
+
+	<div id="busy" class="busy" hidden>
+		<div class="busy-box">
+			<div id="busyText">working…</div>
+			<div class="bar-track"><div class="bar-fill" id="busyFill"></div></div>
+		</div>
+	</div>
+
+	<script src="js/lib/zip.js"></script>
+	<script src="js/lib/idb.js"></script>
+	<script src="js/engrave/tiling.js"></script>
+	<script src="js/engrave/imaging.js"></script>
+	<script src="js/engrave/gcode.js"></script>
+	<script src="js/engrave/export.js"></script>
+	<script src="js/engrave/state.js"></script>
+	<script src="js/engrave/ui.js"></script>
+</body>
+
+</html>

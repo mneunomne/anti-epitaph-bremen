@@ -1,0 +1,36 @@
+/* the 3d piece: two pallets of brick, one inscribed, one scrambled */
+
+body {
+	margin: 0;
+	background: #8a8580;
+	overflow: hidden;
+	font-family: monospace;
+}
+
+#panel {
+	position: fixed;
+	top: 12px;
+	left: 12px;
+	color: #2a2723;
+	font-size: 11px;
+	line-height: 1.8;
+	background: rgba(255, 255, 255, 0.55);
+	padding: 10px 12px;
+}
+
+#panel label {
+	display: block;
+	cursor: pointer;
+}
+
+#panel a {
+	color: #2a2723;
+}
+
+#status {
+	color: #5a5248;
+}
+
+#status.error {
+	color: #7a2f1e;
+}

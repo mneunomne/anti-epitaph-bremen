@@ -1,0 +1,656 @@
+/* the engraving desk — a workshop instrument, not a website.
+   warm neutrals off the clay palette of the piece, monospace throughout,
+   dense enough to hold a whole wall on one screen. */
+
+:root {
+	--bg: #1c1a18;
+	--panel: #232120;
+	--panel-2: #2b2826;
+	--line: #3a3633;
+	--ink: #e6e0d8;
+	--dim: #9a938a;
+	--faint: #6d665e;
+	--clay: #c07a52;
+	--clay-dim: #8a5738;
+
+	--pending: #6d665e;
+	--queued: #d4a13c;
+	--engraved: #7fa86a;
+	--failed: #c0563e;
+	--skipped: #4f4b47;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--ink);
+	font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+	display: flex;
+	flex-direction: column;
+	min-height: 100vh;
+}
+
+h2 {
+	font-size: 11px;
+	letter-spacing: .12em;
+	text-transform: uppercase;
+	color: var(--clay);
+	margin: 0 0 8px;
+	font-weight: 600;
+}
+
+a {
+	color: var(--dim);
+}
+
+a:hover {
+	color: var(--clay);
+}
+
+.grow {
+	flex: 1;
+}
+
+.hint {
+	color: var(--faint);
+	margin: 6px 0 0;
+	font-size: 11px;
+}
+
+/* ---------------- top bar ---------------- */
+.bar {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	padding: 8px 14px;
+	background: var(--panel);
+	border-bottom: 1px solid var(--line);
+	position: sticky;
+	top: 0;
+	z-index: 20;
+	flex-wrap: wrap;
+}
+
+.brand {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+}
+
+.brand strong {
+	color: var(--clay);
+	letter-spacing: .06em;
+}
+
+.brand a {
+	font-size: 11px;
+	text-decoration: none;
+}
+
+.proj {
+	display: flex;
+	gap: 4px;
+	align-items: center;
+}
+
+/* selects in the bar size to their content — left at 100% they claim a
+   whole row and push everything else onto a second line */
+.bar select {
+	width: auto;
+	max-width: 240px;
+}
+
+.progress {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 190px;
+	flex: 0 1 260px;
+}
+
+.progress span {
+	white-space: nowrap;
+	color: var(--dim);
+}
+
+.bar-track {
+	flex: 1;
+	height: 6px;
+	background: var(--panel-2);
+	border: 1px solid var(--line);
+	overflow: hidden;
+	min-width: 90px;
+}
+
+.bar-fill {
+	height: 100%;
+	width: 0;
+	background: var(--engraved);
+	transition: width .25s;
+}
+
+/* ---------------- form furniture ---------------- */
+button,
+select,
+input,
+output {
+	font: inherit;
+	color: var(--ink);
+}
+
+button {
+	background: var(--panel-2);
+	border: 1px solid var(--line);
+	padding: 4px 9px;
+	cursor: pointer;
+}
+
+button:hover {
+	border-color: var(--clay-dim);
+	color: #fff;
+}
+
+button.primary {
+	background: var(--clay-dim);
+	border-color: var(--clay);
+	color: #fff;
+}
+
+button.primary:hover {
+	background: var(--clay);
+}
+
+button.danger:hover {
+	border-color: var(--failed);
+	color: var(--failed);
+}
+
+button.wide {
+	display: block;
+	width: 100%;
+	margin: 6px 0 0;
+}
+
+button.on {
+	background: var(--clay-dim);
+	border-color: var(--clay);
+	color: #fff;
+}
+
+select,
+input[type=number],
+input[type=text],
+input[type=search] {
+	background: var(--bg);
+	border: 1px solid var(--line);
+	padding: 3px 5px;
+	width: 100%;
+	min-width: 0;
+}
+
+input[type=range] {
+	width: 100%;
+	accent-color: var(--clay);
+	margin: 2px 0;
+}
+
+label {
+	display: block;
+	margin: 7px 0 0;
+	color: var(--dim);
+	font-size: 11px;
+}
+
+label i {
+	font-style: normal;
+	color: var(--faint);
+	margin-left: 4px;
+}
+
+label output {
+	color: var(--ink);
+	float: right;
+}
+
+label.check {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+}
+
+label.check input {
+	width: auto;
+	accent-color: var(--clay);
+}
+
+.pair,
+.triple {
+	display: grid;
+	gap: 8px;
+}
+
+.pair {
+	grid-template-columns: 1fr 1fr;
+}
+
+.triple {
+	grid-template-columns: 1fr 1fr 1fr;
+}
+
+/* ---------------- layout ---------------- */
+.layout {
+	display: grid;
+	grid-template-columns: 260px minmax(0, 1fr) 280px;
+	gap: 1px;
+	background: var(--line);
+	flex: 1;
+	min-height: 0;
+}
+
+.col {
+	background: var(--bg);
+	min-width: 0;
+}
+
+.controls,
+.side {
+	overflow-y: auto;
+	max-height: calc(100vh - 46px);
+}
+
+.controls section,
+.side section {
+	padding: 12px 14px;
+	border-bottom: 1px solid var(--line);
+}
+
+/* ---------------- stage ---------------- */
+.stage {
+	display: flex;
+	flex-direction: column;
+	min-height: 460px;
+}
+
+.stage-tools {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 7px 12px;
+	border-bottom: 1px solid var(--line);
+	background: var(--panel);
+	flex-wrap: wrap;
+}
+
+.views {
+	display: flex;
+	gap: 3px;
+}
+
+.canvas-wrap {
+	flex: 1;
+	display: grid;
+	place-items: center;
+	padding: 18px;
+	background:
+		repeating-conic-gradient(#242220 0% 25%, #1e1c1a 0% 50%) 0 0/22px 22px;
+	overflow: auto;
+	min-height: 0;
+}
+
+#stage {
+	max-width: 100%;
+	max-height: 100%;
+	cursor: crosshair;
+	box-shadow: 0 6px 30px rgba(0, 0, 0, .55);
+}
+
+.stage-foot {
+	padding: 7px 12px;
+	border-top: 1px solid var(--line);
+	background: var(--panel);
+	color: var(--dim);
+	font-size: 11px;
+	display: flex;
+	gap: 16px;
+	flex-wrap: wrap;
+}
+
+.stage-foot b {
+	color: var(--ink);
+	font-weight: 500;
+}
+
+.stage-foot .warn {
+	color: var(--queued);
+}
+
+.stage-foot .bad {
+	color: var(--failed);
+}
+
+/* ---------------- inspector ---------------- */
+.insp-body .row {
+	display: flex;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 2px 0;
+	color: var(--dim);
+}
+
+.insp-body .row b {
+	color: var(--ink);
+	font-weight: 500;
+}
+
+#inspLabel {
+	color: var(--ink);
+	text-transform: none;
+	letter-spacing: 0;
+}
+
+.chip-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin: 8px 0;
+}
+
+.chip {
+	padding: 3px 8px;
+	border: 1px solid var(--line);
+	background: var(--panel-2);
+	cursor: pointer;
+	font-size: 11px;
+}
+
+.chip.on {
+	color: #14120f;
+	font-weight: 600;
+}
+
+.chip[data-status=queued].on {
+	background: var(--queued);
+	border-color: var(--queued);
+}
+
+.chip[data-status=engraved].on {
+	background: var(--engraved);
+	border-color: var(--engraved);
+}
+
+.chip[data-status=failed].on {
+	background: var(--failed);
+	border-color: var(--failed);
+	color: #fff;
+}
+
+.chip[data-status=skipped].on {
+	background: var(--skipped);
+	border-color: var(--skipped);
+	color: var(--ink);
+}
+
+.chip[data-status=pending].on {
+	background: var(--pending);
+	border-color: var(--pending);
+}
+
+#inspThumb {
+	width: 100%;
+	display: block;
+	margin: 8px 0;
+	border: 1px solid var(--line);
+	image-rendering: pixelated;
+	background: #000;
+}
+
+textarea {
+	width: 100%;
+	background: var(--bg);
+	border: 1px solid var(--line);
+	color: var(--ink);
+	font: inherit;
+	padding: 4px;
+	resize: vertical;
+	min-height: 46px;
+}
+
+/* ---------------- tally ---------------- */
+.tally {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 4px;
+}
+
+.tally div {
+	display: flex;
+	justify-content: space-between;
+	padding: 3px 6px;
+	background: var(--panel-2);
+	border-left: 3px solid var(--line);
+}
+
+.tally div b {
+	font-weight: 600;
+}
+
+.tally .t-pending {
+	border-color: var(--pending);
+}
+
+.tally .t-queued {
+	border-color: var(--queued);
+}
+
+.tally .t-engraved {
+	border-color: var(--engraved);
+}
+
+.tally .t-failed {
+	border-color: var(--failed);
+}
+
+.tally .t-skipped {
+	border-color: var(--skipped);
+}
+
+.bulk {
+	display: flex;
+	gap: 4px;
+	margin-top: 8px;
+}
+
+.bulk button {
+	flex: 1;
+	font-size: 11px;
+}
+
+.log {
+	max-height: 190px;
+	overflow-y: auto;
+	color: var(--faint);
+	font-size: 11px;
+}
+
+.log div {
+	padding: 2px 0;
+	border-bottom: 1px solid var(--panel-2);
+}
+
+.log time {
+	color: var(--line);
+	margin-right: 6px;
+}
+
+/* ---------------- ledger ---------------- */
+.ledger {
+	border-top: 1px solid var(--line);
+	background: var(--panel);
+}
+
+.ledger-head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 14px;
+	flex-wrap: wrap;
+}
+
+.ledger-head h2 {
+	margin: 0;
+}
+
+.ledger-head input,
+.ledger-head select {
+	width: auto;
+	min-width: 150px;
+}
+
+.table-wrap {
+	max-height: 330px;
+	overflow: auto;
+	border-top: 1px solid var(--line);
+}
+
+table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 11px;
+}
+
+th {
+	position: sticky;
+	top: 0;
+	background: var(--panel-2);
+	text-align: left;
+	padding: 5px 10px;
+	color: var(--dim);
+	font-weight: 500;
+	border-bottom: 1px solid var(--line);
+	white-space: nowrap;
+}
+
+td {
+	padding: 3px 10px;
+	border-bottom: 1px solid #292624;
+	white-space: nowrap;
+}
+
+tbody tr:hover {
+	background: var(--panel-2);
+	cursor: pointer;
+}
+
+tbody tr.sel {
+	background: #332c25;
+}
+
+td.st {
+	font-weight: 600;
+}
+
+td.st[data-s=pending] {
+	color: var(--pending);
+}
+
+td.st[data-s=queued] {
+	color: var(--queued);
+}
+
+td.st[data-s=engraved] {
+	color: var(--engraved);
+}
+
+td.st[data-s=failed] {
+	color: var(--failed);
+}
+
+td.st[data-s=skipped] {
+	color: var(--skipped);
+}
+
+td.notes {
+	white-space: normal;
+	color: var(--dim);
+	max-width: 320px;
+}
+
+/* ---------------- overlays ---------------- */
+.toast {
+	position: fixed;
+	bottom: 16px;
+	left: 50%;
+	transform: translateX(-50%) translateY(20px);
+	background: var(--panel-2);
+	border: 1px solid var(--clay-dim);
+	padding: 7px 16px;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity .2s, transform .2s;
+	z-index: 60;
+}
+
+.toast.show {
+	opacity: 1;
+	transform: translateX(-50%) translateY(0);
+}
+
+.busy {
+	position: fixed;
+	inset: 0;
+	background: rgba(12, 11, 10, .8);
+	display: grid;
+	place-items: center;
+	z-index: 50;
+}
+
+.busy[hidden] {
+	display: none;
+}
+
+.busy-box {
+	background: var(--panel);
+	border: 1px solid var(--line);
+	padding: 18px 22px;
+	min-width: 300px;
+}
+
+.busy-box .bar-track {
+	margin-top: 10px;
+}
+
+.bundled-list {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	margin-top: 6px;
+}
+
+.bundled-list button {
+	text-align: left;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 11px;
+}
+
+.drop.over {
+	outline: 1px dashed var(--clay);
+	outline-offset: 4px;
+}
+
+@media (max-width: 1100px) {
+	.layout {
+		grid-template-columns: 1fr;
+	}
+
+	.controls,
+	.side {
+		max-height: none;
+	}
+}

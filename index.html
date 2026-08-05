@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<title>anti-epigraph block</title>
+	<link rel="icon"
+		href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%238a8580'/><rect x='2' y='5' width='12' height='6' fill='%23a26044'/></svg>">
+	<link rel="stylesheet" href="css/piece.css">
+</head>
+
+<body>
+	<div id="panel">
+		<div id="status">loading images…</div>
+		<label><input type="checkbox" id="engrave" checked> engraved look</label>
+		<label>cols <input type="range" id="cols" min="2" max="14" value="6"> <span id="colsV">6</span></label>
+		<label>courses <input type="range" id="courses" min="1" max="8" value="3"> <span id="coursesV">3</span></label>
+		<label>disrupt <input type="range" id="disrupt" min="0" max="100" value="25"> <span id="disruptV">25</span></label>
+		<div>drag to rotate / scroll to zoom</div>
+		<div>click a brick to remove it</div>
+		<div><a href="engrave.html">→ engraving desk</a></div>
+	</div>
+
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+	<script src="js/piece.js"></script>
+</body>
+
+</html>
