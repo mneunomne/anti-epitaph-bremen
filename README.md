@@ -1,6 +1,6 @@
 # anti-epigraph — bremen
 
-Five pages, no build step, no dependencies to install.
+Six pages, no build step, no dependencies to install.
 
 - **[index.html](index.html)** — the piece. One pallet of brick laid flat, the fazenda
   painting inscribed across its top course and broken by scraps of the Bremen
@@ -15,9 +15,12 @@ Five pages, no build step, no dependencies to install.
   came from, the country ledger, the goods, the shipping. Set in the volume's own
   furniture — fat Egyptian headings, leader dots, figures flush right, a dash
   where the page has a dash.
-- **[tafeln.html](tafeln.html)** — die Tafeln. The same volumes cut the other way:
-  one block per place with its goods running down it, laid out on a sheet by hand
-  and exported as an image.
+- **[tafeln.html](tafeln.html)** — die Tafel. The same volumes cut the other way:
+  one block per place, its goods running down it. One table at a time, set and
+  exported as an image.
+- **[stapel.html](stapel.html)** — der Stapel. The same block stood up: one brick
+  a course, three goods to a face, so the stack is as high as the place had goods
+  to send.
 
 Every brick is 200 × 95 × 50 — one size, set in one place — so the field is a
 grid and one blank is interchangeable with any other. Nothing keeps a list of
@@ -38,8 +41,9 @@ the browser will not read a sibling file from `file://`, so use *choose an
 image…* or drop a file in instead.
 
 The piece pulls three.js from a CDN, so it needs a connection the first time.
-The desks need nothing, and neither do the trade tables — d3-geo, the coastlines
-and both faces are vendored, so `handel.html` also opens straight off `file://`.
+Nothing else does: the desks need no network, and neither do the trade tables,
+die Tafel or der Stapel — d3-geo, the coastlines, three.js and all eight faces
+are vendored, so those open straight off `file://` too.
 
 ## Layout
 
@@ -48,14 +52,17 @@ index.html            the piece
 layout.html           the pallets
 engrave.html          the engraving desk (regular wall)
 handel.html           the 1851 trade tables
-tafeln.html           the composing stone — one block per place
+tafeln.html           one block per place, set on its own
+stapel.html           the same block stood up in brick
 css/
   piece.css
   dashboard.css
   yard.css            image slots and the bare-position list
   handel.css          paper, rules, leader dots, the six goods colours
-  tafeln.css          the two faces the blocks are set in
-fonts/                bevan, libre baskerville, ultra, libre bodoni — self-hosted
+  tafeln.css          the faces a block can be set in
+  stapel.css          the yard the stack stands in
+fonts/                ultra, abril, rozha, bevan; bodoni moda, libre bodoni,
+                      playfair, libre baskerville — all self-hosted
 data/
   handel-all.js       every volume in one global — what the page loads
   handel-<year>.json  the same, one file per volume, for anything else
@@ -63,6 +70,7 @@ data/
 js/
   piece.js            the three.js scene
   lib/
+    three.min.js      three.js r128, vendored so the yard opens off file://
     zip.js            store-mode zip writer (~120 lines, no dependency)
     idb.js            indexeddb — projects (desk), plans (pallets)
     d3-geo, d3-array, topojson-client
@@ -72,10 +80,16 @@ js/
     views.js          the ledger, the goods, the shipping, the drawer
     app.js            tabs, state, the address bar
   tafeln/
-    model.js          the volume by place — dittos resolved, measures folded
-    plate.js          one block, set the way the volumes set it
-    board.js          the sheet, the columns, the step, autoflow
-    ui.js             the stone — drag, span, row budget, export
+    model.js          the volume by place — two printings reconciled,
+                      dittos resolved, measures folded
+    plate.js          one block — every metric and face a parameter
+    ink.js            the press: turbulence, displacement, ink gain, specks
+    ui.js             the block, and every setting on it
+    board.js          (not loaded) the sheet that laid many blocks on a grid
+  stapel/
+    faces.js          what is printed on a stretcher, a header and a bed
+    scene.js          the stack, the lights, the orbit
+    ui.js             the yard
   yard/
     pack.js           pallet geometry, the grid, picture → position crop
     plan.js           the plan, and the record of what has been cut
@@ -418,6 +432,23 @@ distinction is the whole point of the transpose, so the sum is labelled
 *Werth im Ganzen*, or *Werth, so weit beziffert* where some good in the block is
 a dash rather than a number.
 
+### Two printings, never both
+
+The volumes print the same goods twice. The **Waarenverzeichniss der Einfuhr**
+lists them country by country; the **by-article tables** list them article by
+article with the countries as rows. Adding the two counts Cuba's sugar twice,
+under two different names — so a place the country lists reach is taken from
+them entire, and the by-article table fills only the places they never reached.
+
+The country lists are much the finer of the two. Brasilien 1851 runs to 25 goods
+there against 10 in the by-article table, and its largest import of all —
+*Caffee*, 800,677 Ld'or — stands only in the list. A block says at the head of
+the panel which printing it came off, and one built off the by-article table is
+marked, because it is the coarser reading rather than the whole of what that
+place sent.
+
+1859 has no country lists at all, so every block that year is by-article.
+
 ### The measures
 
 The great colonial goods are weighed net, and the volumes say so once at the
@@ -439,33 +470,264 @@ quote. Two passes fix it, both before the rows are regrouped:
 the scan said, ditto marks and all — this is a reading of the source, not a
 correction of it.
 
-### Laying the sheet
+### Setting the block
 
-A block sits on a column and snaps to a vertical step. Drag it to move; drag the
-blue corner to set how many columns it spans and how many goods it shows.
+One table at a time. Pick the place — the list runs biggest *Werth* first, and
+↑ ↓ steps through it — then set how wide the block runs and how many goods it
+shows.
 
 Depth is a count of lines rather than a height in pixels, because a set block is
 always a whole number of lines deep. Goods past the count are not dropped but
-folded into one line — *Uebrige Waaren (84)* — carrying their summed value, which
-is what the volumes do with their own tails and call *Uebrige Einfuhr*. So the
-sum at the foot is right whatever the block is cut to.
+folded into one line — *Uebrige Waaren (74)* — carrying their summed value,
+which is what the volumes do with their own tails and call *Uebrige Einfuhr*. So
+the sum at the foot is right whatever the block is cut to. The fold takes a line
+of its own, so a budget of 14 names 13 goods and folds the rest.
 
-*fill the columns* drops every block into the shortest column that will take it,
-the way the page fills. *cut the sheet to the last block* trims the height to
-what is actually laid. Arrow keys nudge the selected block a step; backspace
-lifts it off.
+The goods panel lists every good in the block, greying the ones that fell into
+the fold, so what is being left out is on screen rather than guessed at.
+
+### Every setting on it
+
+The defaults in `plate.js` are one reading of the printed page, not the only
+one, so all of them are exposed and none are constants:
+
+- **the type** — the display face and the text face, chosen off the eight
+  self-hosted ones or a system Didot; the size of each corpus separately (the
+  place, the *Einfuhr von*, the column heads, the goods, the foot); tracking on
+  the name and on the heads; the weight the goods are set in; and what a name
+  too wide for the measure does — squeeze, shrink, or break in two.
+- **the spacing** — every gap in the block: inside the frame on three sides,
+  under the kicker, under the name, under the heavy rule, the head line, the
+  line the goods sit on, the gap inside a column, and the lines round the sum.
+- **the rules** — the weight of the heavy frame, the white between it and the
+  hair inside it, the rule under the name and how far it is held clear of the
+  sides, the rule under the heads, the vertical column rules, the rule over the
+  sum, and the leader dots: where they start, how far apart, how big.
+- **the canvas** — close round the block, or a fixed width and height with the
+  block set in the middle of it, at the top, or to one side.
+
+### The press
+
+A block drawn on a canvas is too clean to have come off a bed of metal in 1860.
+The scans show three separate faults, and *the press* puts all three back: the
+edge of every stroke wanders, because damp paper and worn type never meet the
+same way twice; the ink gains or starves, fattening the fine serifs or breaking
+the hairlines outright; and the whole thing sits in grain, with the odd speck on
+otherwise clean paper.
+
+This is usually written as an SVG filter — `feTurbulence` into
+`feDisplacementMap`, then a hard `feComponentTransfer`. That filters what is
+*shown*, though, not what the canvas holds, so it would vanish the moment the
+block was exported. `ink.js` does the same three steps to the pixels instead:
+two octaves of value noise displace the field, a separable box blur gains the
+ink, and a threshold that wanders with the grain brings the edge down. Specks
+are hashed per grain of paper rather than sampled off the smooth field, so a
+speck is a speck and not a soft blob the size of the turbulence cell.
+
+The grain is sized in paper, not in pixels, so it stays the same on the sheet
+whether that is a screen preview or a 4× plate. It costs about 70 ms a megapixel,
+so the preview draws clean first and runs the press a beat later — a slider
+answers immediately and the paper catches up.
 
 ### What leaves
 
-**export png** re-runs the same render with the screen furniture — grid,
-selection, handles — switched off, at 1× to 4×. Nothing is scaled up after the
-fact: the type is set at the export size, so a 4× plate is four times the type,
-not four times the pixels. The sheet itself saves as `.json` and loads back.
+**export png** re-runs the same render at 1× to 4×. Nothing is scaled up after
+the fact: the type is set at the export size, so a 4× plate is four times the
+type, not four times the pixels. **export csv** writes the same block as
+figures — every good, its quantity, its measure and its value, closing on the
+sum.
 
 ### The faces
 
-Ultra is the nearest free cut of the Fette Antiqua the volumes head their blocks
-with — a true fat face, hairline serifs, the stress dead vertical. Libre Bodoni
-is a Didone for the text and the figures, where Libre Baskerville (a
-transitional) sat a century too early. Both self-hosted alongside the other two,
-so this page also opens straight off `file://`.
+Eight to choose between, all self-hosted, so the page keeps its faces off-line
+and opens straight off `file://`.
+
+For the place at the head of the block, the fat faces: **Ultra** is the nearest
+free cut of the Fette Antiqua the volumes actually use — hairline serifs, the
+stress dead vertical — with **Abril Fatface** and **Rozha One** as the same idea
+drawn later, and **Bevan** for the fat Egyptian the earlier pages sometimes head
+with instead.
+
+For the text and the figures, the Didones: **Bodoni Moda** (which carries optical
+sizes, so it holds up small), **Libre Bodoni**, and **Playfair Display**. **Libre
+Baskerville** stays on the list as the transitional it is — a century early for
+this book, and against a Didone it shows. A mac's own **Didot**, **Bodoni 72** and
+**Hoefler Text** are offered too, though a block set in one of those will not
+render the same on another machine.
+
+## Der Stapel
+
+[stapel.html](stapel.html) stands the block up in brick.
+
+The brick is 200 × 100 × 50 and never changes — the same one the pallets and the
+engraving desk are built round. Laid as a stretcher it shows three faces to
+anyone in front of it, and this page prints two of them plus the bed of the top
+course:
+
+| face | size | what is on it |
+| --- | --- | --- |
+| the stretcher | 200 × 50 | the good, run out on leader dots to its quantity and measure |
+| the header | 100 × 50 | the value of those same three goods, flush right |
+| the bed | 200 × 100 | the place, which printing it was read off, and the sum |
+| the far end | 100 × 50 | the place's name, if it is asked for |
+| the back | 200 × 50 | the same, where a long name has room to stand |
+
+The two bare faces can carry the place's name, and then it repeats down every
+course of the stack the way a title repeats down the spines of a run of volumes
+— which is the point of putting it there: from the side a stack stops being a
+column of figures and becomes one named thing. It costs almost nothing, because
+the name is the same on every brick of a stack: one nameplate is drawn and the
+one material hung on all of them, so a stack of thirty courses pays for one.
+
+### Both sides
+
+A brick has two stretchers and two headers, not one of each. Printed on **both
+sides** the back pair carries the next three goods and their values instead of
+the name, so a brick holds six and the stack comes out **half as high** for the
+same reading — Brasilien 1851 falls from eight courses to four, and four stacks
+of it from 63 bricks to 32.
+
+Nothing is lost but standing still. No one in front of the stack sees more than
+half of what the place sent; the rest is round the back. That is a real cost and
+worth choosing deliberately rather than taking for the saving — but for anything
+that is going to be walked around, or fired, it halves the clay.
+
+The name has nowhere left to go when both sides are printed, so that control
+greys out rather than silently doing nothing.
+
+### The bed
+
+The top course carries the place, the printing it was read off and the sum. It
+can be cut to **the source and the sum only** — the reckoning without the place
+standing over it in fat face — or to **nothing at all**. In a yard seen from
+above the names are the loudest thing on the field, and sometimes the figures
+are the point. The place is sized in millimetres on both the faces it appears
+on, the bed and the end, and the rule and the source line under it follow its
+baseline rather than sitting at a fixed height.
+
+### The pallet
+
+The whole yard can stand on **one EPAL 1**, 1200 × 800 × 144, built the way one
+is: three bottom boards, nine blocks, three stringers, five deck boards — which
+is where the 144 comes from. It is the same pallet the yard and the engraving
+desk are built round. One, not one under each stack: a pallet is 1200 × 800
+against a stack's footprint of 200 × 100, so a pallet each would be a yard of
+mostly empty deck.
+
+A pallet does not grow, so either the field is cut to it or the stacks hang off
+the edge. Which of the two is happening is measured rather than assumed, and the
+foot of the page says **on the pallet** or **hangs off the pallet**. *Cut the
+field to the pallet* works out how many stacks to a row and what gaps put them
+all on the deck with the gaps as even as they can be — six stacks come out three
+across at 300 × 600 mm, filling the 1200 × 800 exactly. If they will not go at
+all, it says so rather than arranging something that overhangs.
+
+### The order
+
+Left to right, the yard reads as whatever order the stacks were set out in, and
+the default — biggest *Werth* first — makes the field a ranking. A ranking is an
+argument. **Shuffled** deals them again off the field's own seed, so the plan
+says only how many there are and how far each runs; *shuffle* reseeds the deal
+and the jitter together. By name, by number of goods, and as picked are there
+too.
+
+Three goods to a course, so nothing about the stack is a design decision: the
+height **is** the number of goods the place sent. Brasilien 1851 at 25 goods
+stands nine courses; Java at three stands one; Hannover at 103 stands
+thirty-five. Stand two beside each other and the comparison is already made.
+
+The rows on the header line up with the rows on the stretcher because both faces
+are the same 50 deep and cut the same way. The bed is drawn only on the top
+course — every other one is buried under the brick above it, so there is nothing
+to read there.
+
+Faces are canvas textures drawn in millimetres and multiplied up, so the
+typography is set with the same faces, the same leader dots and the same rules
+as the flat block on die Tafel, and the resolution is a slider rather than a
+constant. The press from `ink.js` can be run over them too, which is worth doing
+before anything goes near a laser: what the machine burns is a bitmap, and a
+bitmap that has already been through the press is closer to what the volume
+looks like than clean vector type ever gets.
+
+### The yard
+
+Any number of stacks can stand at once. Pick as many places as are wanted and
+they are set out on a field: so many to a row, the gaps across and back given in
+millimetres between the bricks themselves rather than between their centres, so
+a gap of nought means the stacks touch. Every other row can be shoved over, the
+whole field knocked about by a seeded jitter, and each stack turned a little off
+square.
+
+Seen through **the plan** — a flat camera looking straight down — that field is a
+sheet of beds, one to a place, each carrying its name, which printing it was
+read off, and its sum. Nothing else of a stack shows from directly above, so the
+comparison is made by the plan alone: how many stacks, and how far each runs.
+
+A yard of ten stacks at full texture is a great deal to hold, so the resolution
+drops to 4 px/mm when the field opens up, the four faces that carry nothing are
+made once and shared between every brick in the yard, and the foot of the page
+prints the running texture cost. **Print every face** off draws only the beds,
+which is all the plan shows and a fraction of the memory.
+
+Three.js r128 is vendored into `js/lib/`, so the yard opens straight off
+`file://` like everything else here. Orbit is written out by hand — drag to turn,
+wheel to come closer — rather than pulling a loose OrbitControls file in after it.
+
+## The classes
+
+The volumes divide trade into six heads — *Verzehrungs-Gegenstände*, *Rohstoffe*,
+*Halbfabrikate*, *Manufactur-Waaren*, *Industrie- und Kunsterzeugnisse*,
+*Contanten und edle Metalle* — and print a total under each, place by place.
+
+**Only as a total.** No individual good is tagged with its class anywhere in the
+source: the Waarenverzeichniss simply lists goods, in class order, alphabetically
+within each class, and the class headings themselves did not survive the
+extraction. `handel.html` never classifies a single good either — its category
+bars are read straight off those printed totals.
+
+So the class of a good is not in the data and has to be read off its name, which
+is what `Model.category` does. It places about **89%** of goods across the five
+volumes. The rest fall to *nicht zugeordnet*, which is **shown by default**, so
+that filtering never quietly drops a good on the floor — an unplaced good is
+visible and countable rather than absent.
+
+The obvious check — sum the classified goods per place and compare against the
+printed per-class totals — does not work, and it is worth saying why: the
+itemised goods do not add up to the printed totals in the first place. Hannover
+1851 itemises 2.55 million Ld'or against a printed total of 4.72 million, barely
+half. The two tables were never meant to reconcile line for line, so a
+disagreement measures that gap and not the classifier. Coverage is the honest
+figure, and spot-checking is the honest test.
+
+By default the two classes the volumes themselves put first are shown —
+*Verzehrungs-Gegenstände* and *Rohstoffe* — plus the unplaced. The other four are
+off. Every panel lists all seven with what each holds in the block in hand, so
+turning one off says exactly what it costs.
+
+A filtered block does not show what a place sent, but what it sent under the
+classes asked for, and the sum at the foot says so: *Werth der gewählten Waaren*
+rather than *Werth im Ganzen*. That line is decided in one place, `Model.totalLabel`,
+so the flat block and the brick bed can never disagree about it.
+
+## Cutting a block down
+
+A place like Newyork 1851 sends 78 goods, which is 26 courses — a stack taller
+than the pallet it stands on. Two ways to cut it, and they answer different
+questions.
+
+**A floor under the Werth.** The long tail is what makes a block unwieldy, and
+it is worth almost nothing: 57 of Newyork's 78 goods are worth under 5,000
+Ld'or, and between them they come to 3% of what the place sent. Setting the
+floor at 5,000 takes the stack from 26 courses to 7 and keeps 97% of the value.
+The panel prints what is kept — *keeps 81.3% of the Werth* — measured against
+everything the place sent, so the cost of the floor and of the class filter can
+be read together rather than guessed at.
+
+A good the page never valued is not small, only unknown, so a dash is never cut
+by the floor.
+
+**Striking goods out by name.** Where a floor is too blunt — the thing making a
+stack unwieldy is one good you simply do not want — any good can be struck from
+**every** table at once, and put back the same way. The list runs over everything
+standing in the yard, biggest Werth first, so what is worth striking is at the
+top where it can be seen.

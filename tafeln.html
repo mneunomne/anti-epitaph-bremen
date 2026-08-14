@@ -4,9 +4,9 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>die Tafeln — anti-epigraph</title>
+	<title>die Tafel — anti-epigraph</title>
 	<link rel="icon"
-		href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23f6f2e8'/><rect x='2' y='2' width='5' height='12' fill='%231a1512'/><rect x='9' y='2' width='5' height='12' fill='%231a1512'/></svg>">
+		href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23f6f2e8'/><rect x='3' y='2' width='10' height='12' fill='none' stroke='%231a1512' stroke-width='1.4'/><rect x='5' y='5' width='6' height='1.4' fill='%231a1512'/></svg>">
 	<link rel="stylesheet" href="css/dashboard.css">
 	<link rel="stylesheet" href="css/tafeln.css">
 </head>
@@ -14,10 +14,11 @@
 <body>
 	<header class="bar">
 		<div class="brand">
-			<strong>die Tafeln</strong>
+			<strong>die Tafel</strong>
 			<a href="index.html">the piece →</a>
 			<a href="layout.html">the pallets →</a>
 			<a href="handel.html">bremens handel →</a>
+			<a href="stapel.html">der Stapel →</a>
 		</div>
 
 		<div class="proj">
@@ -29,123 +30,146 @@
 		<label class="check" title="print the measures as the scan gave them, ditto marks and all">
 			<input type="checkbox" id="rawUnits"> raw measures
 		</label>
+		<button id="exportCsv">export csv</button>
 		<select id="exScale" title="how many times full size">
 			<option value="1">1× — screen</option>
 			<option value="2" selected>2× — print</option>
 			<option value="3">3×</option>
 			<option value="4">4× — plate</option>
 		</select>
-		<label class="check" title="cut the sheet off under the last block"><input type="checkbox" id="exTrim" checked>
-			trim</label>
 		<button id="exportPng" class="primary">export png</button>
 	</header>
 
 	<main class="layout">
-		<!-- ---------------- the volume ---------------- -->
+		<!-- ---------------- the place ---------------- -->
 		<aside class="col controls">
 			<section>
-				<h2>the sheet</h2>
-				<div class="pair">
-					<label>width <input type="number" id="sheetW" min="200" step="10"><i>px</i></label>
-					<label>height <input type="number" id="sheetH" min="200" step="10"><i>px</i></label>
+				<h2>the place</h2>
+				<div class="stepper">
+					<button id="prev" title="the one above">↑</button>
+					<button id="next" title="the one below">↓</button>
+					<span class="hint" id="rank">—</span>
 				</div>
-				<div class="triple">
-					<label>&nbsp;<button id="presetA" class="wide" title="1680 × 2240">broadside</button></label>
-					<label>&nbsp;<button id="presetB" class="wide" title="2480 × 3508 — A4 at 300dpi">A4 ↕</button></label>
-					<label>&nbsp;<button id="presetC" class="wide" title="3508 × 2480">A4 ↔</button></label>
-				</div>
-				<button id="trimSheet" class="wide">cut the sheet to the last block</button>
-				<label class="check"><input type="checkbox" id="showHead" checked> running head and foot</label>
-				<label>folio <input type="text" id="folio" maxlength="6"></label>
-			</section>
-
-			<section>
-				<h2>the measure</h2>
-				<div class="pair">
-					<label>columns <input type="number" id="cols" min="1" max="8" step="1"></label>
-					<label>gutter <input type="number" id="gutter" min="0" step="2"><i>px</i></label>
-				</div>
-				<div class="pair">
-					<label>margin <input type="number" id="margin" min="0" step="2"><i>px</i></label>
-					<label>step <input type="number" id="rowStep" min="2" step="1"><i>px</i></label>
-				</div>
-				<p class="hint">a block sits on a column and snaps to the step. drag it to move; drag the blue
-					corner to set how many columns it spans and how many goods it shows.</p>
-				<button id="flow" class="wide">fill the columns</button>
-			</section>
-
-			<section>
-				<h2>the places</h2>
 				<label>search <input type="search" id="placeSearch" placeholder="Cuba, Hannover, …"></label>
 				<div class="picker" id="picker"></div>
-				<div class="pair" style="margin-top:8px">
-					<label>lay the top <input type="number" id="addN" min="1" max="60" step="1" value="12"></label>
-					<label>&nbsp;<button id="addTop" class="wide">lay them</button></label>
-				</div>
-			</section>
-
-			<section>
-				<h2>backup</h2>
-				<button id="exportJson" class="wide">save the sheet as .json</button>
-				<button id="importJson" class="wide">load a sheet .json…</button>
-				<input type="file" id="jsonFile" accept="application/json,.json" hidden>
+				<p class="hint">↑ ↓ steps through the places, biggest Werth first.</p>
 			</section>
 		</aside>
 
-		<!-- ---------------- the stone ---------------- -->
+		<!-- ---------------- the block ---------------- -->
 		<section class="col stage">
 			<div class="stage-tools">
-				<div class="zoomrow" style="min-width:220px">
-					<input type="range" id="zoom" min="5" max="200" step="1" value="50">
-					<output id="zoomV">50%</output>
+				<div class="zoomrow" style="min-width:250px">
+					<input type="range" id="zoom" min="10" max="400" step="1" value="100">
+					<output id="zoomV">100%</output>
 					<button id="zoomFit">fit</button>
+					<button id="zoom1">1:1</button>
 				</div>
 				<div class="grow"></div>
-				<label class="check"><input type="checkbox" id="showGuides" checked> column guides</label>
+				<span class="hint" id="pages">—</span>
 			</div>
 
-			<div class="canvas-wrap fitted" id="canvasWrap">
+			<div class="canvas-wrap" id="canvasWrap">
 				<canvas id="stage"></canvas>
 			</div>
 
 			<div class="stage-foot" id="stageFoot">—</div>
 		</section>
 
-		<!-- ---------------- the block in hand ---------------- -->
+		<!-- ---------------- how it is set ---------------- -->
 		<aside class="col side">
 			<section>
-				<h2>the block — <span id="selLabel">—</span></h2>
-				<p class="hint" id="selNone">click a block on the sheet.</p>
-				<div id="selBody" hidden>
-					<label>columns wide <input type="number" id="selSpan" min="1" step="1"></label>
-					<label>goods shown <input type="range" id="selRows" min="1" step="1">
-						<output id="selRowsV"></output>
+				<h2>the block — <span id="blockName">—</span></h2>
+				<label>width <input type="number" id="width" min="160" max="3000" step="10"><i>px</i></label>
+				<label>goods shown <input type="range" id="rows" min="1" step="1">
+					<output id="rowsV"></output>
+				</label>
+				<button id="allRows" class="wide">show every good</button>
+				<p class="hint" id="source">—</p>
+				<label class="check"><input type="checkbox" id="kicker"> “Einfuhr von” over the name</label>
+				<label class="check"><input type="checkbox" id="total"> close with the sum</label>
+				<label class="check"><input type="checkbox" id="foot"> the year and the pages</label>
+				<p class="hint">what falls past the count is folded into one line — <i>Uebrige Waaren</i> —
+					carrying its summed value, so the sum at the foot is right whatever the block is cut to.</p>
+			</section>
+
+			<section>
+				<div class="panel-head">
+					<h2>the classes</h2>
+					<button id="catsAll">all</button>
+					<button id="catsDefault">reset</button>
+				</div>
+				<div class="cats" id="cats"></div>
+				<p class="hint">Read off the names of the goods — the volumes class a place's trade
+					under six heads, but never tag a single good with its class. About nine in ten are
+					placed; the rest fall to <i>nicht zugeordnet</i>, shown by default so nothing
+					quietly vanishes from the block.</p>
+			</section>
+
+			<section>
+				<h2>the canvas</h2>
+				<label class="check"><input type="checkbox" id="canvasFit"> close round the block</label>
+				<label>white round it <input type="number" id="canvasMargin" min="0" max="400" step="4"><i>px</i></label>
+				<div id="canvasFixed">
+					<div class="grid2">
+						<label>width <input type="number" id="canvasW" min="100" step="10"><i>px</i></label>
+						<label>height <input type="number" id="canvasH" min="100" step="10"><i>px</i></label>
+					</div>
+					<label>the block sits
+						<select id="canvasAlign">
+							<option value="center">in the middle</option>
+							<option value="top">at the top</option>
+							<option value="left">to the left</option>
+							<option value="right">to the right</option>
+						</select>
 					</label>
-					<button id="selAllRows" class="wide">show every good</button>
-					<label class="check"><input type="checkbox" id="selKicker"> “Einfuhr von” over the name</label>
-					<label class="check"><input type="checkbox" id="selTotal"> close with the sum</label>
-					<label class="check"><input type="checkbox" id="selFoot"> the year and the pages</label>
-					<p class="hint" id="selNote"></p>
-					<button id="selDrop" class="wide danger">lift this block off</button>
+					<button id="fitToBlock" class="wide">take the block's own size</button>
 				</div>
 			</section>
 
 			<section>
-				<h2>laid on the sheet <span class="hint" id="laidCount"></span></h2>
-				<div class="laid-list" id="laidList"></div>
-				<button id="clearAll" class="wide" style="margin-top:8px">clear the sheet</button>
+				<div class="panel-head">
+					<h2>the type</h2>
+					<button id="resetType" title="every metric back to the volume's own setting">reset</button>
+				</div>
+				<div id="p_type"></div>
+			</section>
+
+			<section>
+				<h2>the spacing</h2>
+				<div id="p_space"></div>
+			</section>
+
+			<section>
+				<h2>the rules</h2>
+				<div id="p_rules"></div>
+			</section>
+
+			<section>
+				<div class="panel-head">
+					<h2>the press</h2>
+					<button id="resetInk">reset</button>
+				</div>
+				<label class="check"><input type="checkbox" id="inkOn"> run it through the press</label>
+				<div id="p_ink"></div>
+				<button id="reseed" class="wide">another sheet of paper</button>
+				<p class="hint">the edge of a stroke wanders, the ink gains or starves, and the whole thing
+					sits in grain — done to the pixels, so it is in the exported file and not just on screen.</p>
+			</section>
+
+			<section>
+				<h2>the goods</h2>
+				<div class="goods" id="goods"></div>
+				<p class="hint">greyed rows are the ones folded into <i>Uebrige Waaren</i>.</p>
 			</section>
 
 			<section>
 				<h2>the reading</h2>
-				<p class="hint">The volumes cut the table by article and run the places down it. These blocks cut
-					the other way — one place, its goods under it — so every figure in a block is that place's
-					own figure, and the sum at the foot is what that place sent, not what the article came to
-					across the world.</p>
-				<p class="hint">The great colonial goods — Zucker, Caffee, Sago, Reis, Taback, Cacao, Baumwolle —
-					are weighed net, said once at the head of the printed block and carried down it on ditto
-					marks. Read line by line those marks are lost, so they are restored here as
-					<span class="swatch">℔ Nto.</span> Everything else keeps the measure the page gave it.
+				<p class="hint">Every figure here is that place's own figure, and the sum at the foot is what
+					that place sent — not what the article came to across the world.</p>
+				<p class="hint">Zucker, Caffee, Sago, Reis, Taback, Cacao and Baumwolle are weighed net, said
+					once at the head of the printed block and carried down it on ditto marks. Read line by
+					line those marks are lost, so they are restored here as <span class="swatch">℔ Nto.</span>
 				</p>
 			</section>
 		</aside>
@@ -156,7 +180,7 @@
 	<script src="data/handel-all.js"></script>
 	<script src="js/tafeln/model.js"></script>
 	<script src="js/tafeln/plate.js"></script>
-	<script src="js/tafeln/board.js"></script>
+	<script src="js/tafeln/ink.js"></script>
 	<script src="js/tafeln/ui.js"></script>
 </body>
 

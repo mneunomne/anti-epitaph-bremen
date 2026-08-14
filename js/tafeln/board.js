@@ -1,3 +1,8 @@
+/* NOT LOADED — kept off the page while the block itself is being got right.
+ * tafeln.html sets one table at a time; this is the sheet that laid many of
+ * them out on a column grid. Nothing else refers to it. Delete it, or wire it
+ * back in, when composition comes back.
+ */
 /* board.js — the sheet the blocks are laid on.
  *
  * A grid of columns with a gutter between them, and a coarse vertical step,

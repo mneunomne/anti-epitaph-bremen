@@ -1,18 +1,61 @@
-/* die Tafeln — the composing stone.
-   The workshop chrome comes from dashboard.css; what is here is the two
-   faces the blocks are set in, and the furniture round the stone itself. */
+/* die Tafel — the composing stone.
+   The workshop chrome comes from dashboard.css; what is here is the faces
+   the block can be set in, and the furniture round the stone itself. */
 
 /* Ultra is the nearest free cut of the Fette Antiqua the volumes head their
    blocks with — a true fat face, hairline serifs, the stress dead vertical.
-   Libre Bodoni is a Didone for the text and the figures, where Libre
-   Baskerville (a transitional) sat a century too early. Both self-hosted, so
-   the page keeps its face off-line and straight off disk. */
+   Abril and Rozha are the same idea drawn later; Bevan is the fat Egyptian.
+   For the text and the figures the Didones: Bodoni Moda (optical sizes),
+   Libre Bodoni, Playfair. Libre Baskerville stays on the list as the
+   transitional it is — a century early, and it shows. All self-hosted, so
+   the page keeps its faces off-line and straight off disk. */
+
 @font-face {
 	font-family: 'Ultra';
 	font-style: normal;
 	font-weight: 400;
 	font-display: block;
 	src: url('../fonts/ultra-400.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Abril Fatface';
+	font-style: normal;
+	font-weight: 400;
+	font-display: block;
+	src: url('../fonts/abril-fatface-400.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Rozha One';
+	font-style: normal;
+	font-weight: 400;
+	font-display: block;
+	src: url('../fonts/rozha-one-400.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Bevan';
+	font-style: normal;
+	font-weight: 400;
+	font-display: block;
+	src: url('../fonts/bevan-400.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Bodoni Moda';
+	font-style: normal;
+	font-weight: 400 700;
+	font-display: block;
+	src: url('../fonts/bodoni-moda-400.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Bodoni Moda';
+	font-style: italic;
+	font-weight: 400 700;
+	font-display: block;
+	src: url('../fonts/bodoni-moda-400i.woff2') format('woff2');
 }
 
 @font-face {
@@ -31,33 +74,66 @@
 	src: url('../fonts/libre-bodoni-400i.woff2') format('woff2');
 }
 
+@font-face {
+	font-family: 'Playfair Display';
+	font-style: normal;
+	font-weight: 400 700;
+	font-display: block;
+	src: url('../fonts/playfair-400.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Playfair Display';
+	font-style: italic;
+	font-weight: 400 700;
+	font-display: block;
+	src: url('../fonts/playfair-400i.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Libre Baskerville';
+	font-style: normal;
+	font-weight: 400 700;
+	font-display: block;
+	src: url('../fonts/libre-baskerville-400.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Libre Baskerville';
+	font-style: italic;
+	font-weight: 400 700;
+	font-display: block;
+	src: url('../fonts/libre-baskerville-400i.woff2') format('woff2');
+}
+
+/* the panel earns its width — there are a lot of settings on a block */
+.layout {
+	grid-template-columns: 236px minmax(0, 1fr) 320px;
+}
+
 /* ---------------- the stone ---------------- */
 
 #stage {
-	cursor: default;
 	background: #fff;
-}
-
-#stage.grab {
-	cursor: grab;
-}
-
-#stage.grabbing {
-	cursor: grabbing;
-}
-
-#stage.resize {
-	cursor: nwse-resize;
-}
-
-.canvas-wrap.fitted {
-	place-items: start center;
+	cursor: default;
+	box-shadow: 0 6px 30px rgba(0, 0, 0, .55);
 }
 
 /* ---------------- the places to hand ---------------- */
 
+.stepper {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 8px;
+}
+
+.stepper button {
+	padding: 3px 10px;
+}
+
 .picker {
-	max-height: 300px;
+	max-height: calc(100vh - 250px);
 	overflow-y: auto;
 	display: flex;
 	flex-direction: column;
@@ -83,68 +159,113 @@
 	flex: none;
 }
 
-.picker button.laid {
-	opacity: .42;
+.picker button.on {
+	border-color: var(--clay);
+	background: var(--panel-2);
+	color: var(--clay);
 }
 
-.picker button.laid span.n::after {
-	content: ' ✓';
-	color: var(--engraved);
-}
+/* ---------------- the settings ---------------- */
 
-/* ---------------- what is laid ---------------- */
-
-.laid-list {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-}
-
-.laid-row {
-	display: flex;
+/* a metric is a name, a slider and a number on one line — a dozen of them
+   in a group have to stay readable without becoming a wall */
+.ctl {
+	display: grid;
+	grid-template-columns: 118px minmax(0, 1fr) 40px;
 	align-items: center;
-	gap: 6px;
-	padding: 4px 6px;
-	border: 1px solid transparent;
-	cursor: pointer;
+	gap: 7px;
+	margin: 0 0 3px;
+	font-size: 10.5px;
+	color: var(--dim);
 }
 
-.laid-row:hover {
-	background: var(--panel-2);
+.ctl select {
+	grid-column: 2 / span 2;
+	min-width: 0;
+	font-size: 10.5px;
 }
 
-.laid-row.on {
-	border-color: var(--clay-dim);
-	background: var(--panel-2);
+.ctl input[type=range] {
+	margin: 0;
+	min-width: 0;
 }
 
-.laid-row .nm {
+.ctl output {
+	font-size: 10px;
+	text-align: right;
+	color: var(--ink);
+	font-variant-numeric: tabular-nums;
+}
+
+.panel-head {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+}
+
+.panel-head h2 {
 	flex: 1;
+	margin-bottom: 6px;
+}
+
+.panel-head button {
+	font-size: 10px;
+	padding: 1px 6px;
+}
+
+.grid2 {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 6px;
+}
+
+/* ---------------- the goods in the block ---------------- */
+
+.goods {
+	max-height: 220px;
+	overflow-y: auto;
+	font-size: 11px;
+}
+
+.good {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto auto;
+	gap: 8px;
+	padding: 2px 0;
+	border-bottom: 1px solid var(--line);
+	font-variant-numeric: tabular-nums;
+}
+
+.good.out {
+	color: var(--faint);
+}
+
+.good .g-n {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
-.laid-row .pos {
+.good .g-q {
+	color: var(--dim);
+	white-space: nowrap;
+}
+
+.good.out .g-q {
 	color: var(--faint);
-	font-size: 10px;
-	flex: none;
 }
 
-.laid-row .x {
-	flex: none;
-	border: 0;
-	background: none;
+.good .g-q i {
 	color: var(--faint);
-	padding: 0 3px;
-	cursor: pointer;
+	font-style: normal;
 }
 
-.laid-row .x:hover {
-	color: var(--failed);
+.good .g-v {
+	min-width: 62px;
+	text-align: right;
 }
 
-/* ---------------- the sheet's own scale ---------------- */
+/* ---------------- the block's own scale ---------------- */
 
 .zoomrow {
 	display: flex;
@@ -166,4 +287,40 @@
 	font-size: 15px;
 	color: var(--ink);
 	letter-spacing: .02em;
+}
+
+/* a block built off the by-article table is the coarser of the two readings —
+   fewer goods than the place actually sent — so it is marked as such */
+.warnhint {
+	color: var(--queued);
+}
+
+/* ---------------- the classes ---------------- */
+
+.cats label {
+	display: grid;
+	grid-template-columns: 14px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 7px;
+	margin: 0 0 2px;
+	font-size: 10.5px;
+	color: var(--dim);
+	cursor: pointer;
+}
+
+.cats label.off {
+	color: var(--faint);
+}
+
+.cats input {
+	margin: 0;
+}
+
+.cats .n {
+	font-variant-numeric: tabular-nums;
+	color: var(--faint);
+}
+
+.cats label.none .n {
+	opacity: .35;
 }

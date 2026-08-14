@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>der Stapel — anti-epigraph</title>
+	<link rel="icon"
+		href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%231c1a18'/><rect x='2' y='3' width='12' height='3' fill='%23d98741'/><rect x='2' y='7' width='12' height='3' fill='%23d98741'/><rect x='2' y='11' width='12' height='3' fill='%23d98741'/></svg>">
+	<link rel="stylesheet" href="css/dashboard.css">
+	<link rel="stylesheet" href="css/tafeln.css">
+	<link rel="stylesheet" href="css/stapel.css">
+</head>
+
+<body>
+	<header class="bar">
+		<div class="brand">
+			<strong>der Stapel</strong>
+			<a href="tafeln.html">die Tafel →</a>
+			<a href="handel.html">bremens handel →</a>
+			<a href="layout.html">the pallets →</a>
+		</div>
+
+		<div class="proj">
+			<label class="check">Band <select id="yearSel" title="which volume"></select></label>
+		</div>
+
+		<div class="grow"></div>
+
+		<label class="check"><input type="checkbox" id="rawUnits"> raw measures</label>
+		<button id="exportPng" class="primary">save the view</button>
+	</header>
+
+	<main class="layout">
+		<!-- ---------------- the places ---------------- -->
+		<aside class="col controls">
+			<section>
+				<h2>the place</h2>
+				<label class="check"><input type="checkbox" id="many"> stand several in the yard</label>
+				<div class="stepper" id="oneOnly">
+					<button id="prev" title="the one above">↑</button>
+					<button id="next" title="the one below">↓</button>
+					<span class="hint">goods · courses</span>
+				</div>
+				<div id="manyPick" class="pair" hidden>
+					<label>take the top <input type="number" id="pickN" min="1" max="40" step="1" value="8"></label>
+					<label>&nbsp;<button id="pickTop" class="wide">stand them up</button></label>
+				</div>
+				<label>search <input type="search" id="placeSearch" placeholder="Brasilien, Cuba, …"></label>
+				<span class="hint" id="chosenCount"></span>
+				<div class="picker" id="picker"></div>
+			</section>
+		</aside>
+
+		<!-- ---------------- the yard ---------------- -->
+		<section class="col stage">
+			<div class="stage-tools">
+				<div class="views">
+					<button id="vPlan">the plan</button>
+					<button id="vFront">square on</button>
+					<button id="vCorner">the corner</button>
+					<button id="vFrame">fit</button>
+				</div>
+				<div class="grow"></div>
+				<span class="hint">drag to turn · wheel to come closer</span>
+			</div>
+
+			<div class="canvas-wrap yard" id="canvasWrap">
+				<canvas id="stage"></canvas>
+			</div>
+
+			<div class="stage-foot" id="foot">—</div>
+		</section>
+
+		<!-- ---------------- how it stands ---------------- -->
+		<aside class="col side">
+			<section>
+				<h2>the stack — <span id="placeName">—</span></h2>
+				<label>goods to a course <input type="range" id="rows" min="1" max="8" step="1">
+					<output id="rowsV">3</output>
+				</label>
+				<label>the joint <input type="range" id="gap" min="0" max="12" step="0.5">
+					<output id="gapV">2</output>
+				</label>
+				<label class="check"><input type="checkbox" id="outline"> draw the arris</label>
+				<label class="check"><input type="checkbox" id="pallet"> stand it on a euro pallet</label>
+				<button id="fitPallet" class="wide">cut the field to the pallet</button>
+				<label class="check"><input type="checkbox" id="everyFace"> print every face</label>
+				<label>the goods are printed
+					<select id="sides">
+						<option value="1">on the front only</option>
+						<option value="2">on both sides — half the bricks</option>
+					</select>
+				</label>
+				<label>the top course carries
+					<select id="bedOn">
+						<option value="full">the place, the source and the sum</option>
+						<option value="sum">the source and the sum only</option>
+						<option value="none">nothing</option>
+					</select>
+				</label>
+				<label id="nameRow">the place's name also
+					<select id="nameOn">
+						<option value="none">nowhere else</option>
+						<option value="end">on the far end</option>
+						<option value="back">along the back</option>
+						<option value="both">on both</option>
+					</select>
+				</label>
+				<p class="hint">the brick is 200 × 100 × 50 and never changes. Three goods fit across a
+					stretcher, so a stack stands as high as the place had goods to send — that is the
+					whole of what the height means. With <i>print every face</i> off only the beds are
+					drawn, which is all the plan shows and a great deal less to hold.</p>
+			</section>
+
+			<section id="manyOnly" hidden>
+				<div class="panel-head">
+					<h2>the field</h2>
+					<button id="reshuffle">shuffle</button>
+				</div>
+				<label>they stand
+					<select id="order">
+						<option value="werth">biggest Werth first</option>
+						<option value="goods">most goods first</option>
+						<option value="name">by name</option>
+						<option value="picked">as they were picked</option>
+						<option value="shuffle">shuffled</option>
+					</select>
+				</label>
+				<label>stacks to a row <input type="range" id="cols" min="1" max="12" step="1">
+					<output id="colsV">4</output>
+				</label>
+				<label>the gap across <input type="range" id="gapX" min="0" max="600" step="10">
+					<output id="gapXV">120 mm</output>
+				</label>
+				<label>the gap back <input type="range" id="gapZ" min="0" max="600" step="10">
+					<output id="gapZV">120 mm</output>
+				</label>
+				<label>every other row over <input type="range" id="stagger" min="0" max="100" step="5">
+					<output id="staggerV">0%</output>
+				</label>
+				<label>knocked about <input type="range" id="jitter" min="0" max="300" step="5">
+					<output id="jitterV">0 mm</output>
+				</label>
+				<label>turned <input type="range" id="turn" min="0" max="20" step="0.5">
+					<output id="turnV">0°</output>
+				</label>
+				<div class="laid-list" id="chosenList"></div>
+				<button id="clearPicked" class="wide">back to one</button>
+			</section>
+
+			<section>
+				<div class="panel-head">
+					<h2>the classes</h2>
+					<button id="catsAll">all</button>
+					<button id="catsDefault">reset</button>
+				</div>
+				<div class="cats" id="cats"></div>
+				<p class="hint">The volumes class every trade under six heads, but only ever as a
+					place's total — no single good is tagged with its class anywhere in the source.
+					These are read off the names of the goods, which places about nine in ten of them.
+					The rest fall to <i>nicht zugeordnet</i>, shown by default so nothing quietly
+					vanishes from a stack.</p>
+			</section>
+
+			<section>
+				<div class="panel-head">
+					<h2>the goods</h2>
+					<button id="clearStruck">put all back</button>
+				</div>
+				<label>hide anything under <input type="range" id="minValue" min="0" max="10" step="1">
+					<output id="minValueV">no floor</output>
+				</label>
+				<p class="hint" id="share">—</p>
+				<div id="excluded" class="laid-list"></div>
+				<span class="hint" id="excludedCount"></span>
+				<label>search <input type="search" id="goodSearch" placeholder="Baumwolle, Caffee, …"></label>
+				<div id="goodsList" class="laid-list tall"></div>
+				<p class="hint">Everything standing in the yard, biggest Werth first. Striking one out
+					takes it from every table, not only this one — the long tail is what makes a stack
+					unwieldy, and a floor cuts it without having to choose by hand. A good the page never
+					valued is not small, only unknown, so a dash is never cut by the floor.</p>
+			</section>
+
+			<section>
+				<h2>the faces</h2>
+				<label class="ctl">the place<select id="display"></select></label>
+				<label class="ctl">the goods<select id="text"></select></label>
+				<div class="grid2">
+					<label>clay <input type="color" id="clay"></label>
+					<label>ink <input type="color" id="inkCol"></label>
+				</div>
+				<label>texture <input type="range" id="ppmm" min="3" max="16" step="1">
+					<output id="ppmmV">8 px/mm</output>
+				</label>
+				<label>the place on the bed <input type="range" id="titleSize" min="6" max="46" step="0.5">
+					<output id="titleSizeV">21 mm</output>
+				</label>
+				<label>the place on the end <input type="range" id="nameSize" min="6" max="39" step="0.5">
+					<output id="nameSizeV">23 mm</output>
+				</label>
+				<label class="check"><input type="checkbox" id="pressOn"> run the faces through the press</label>
+				<button id="reseed" class="wide">another sheet of paper</button>
+			</section>
+
+			<section>
+				<h2>what is on which face</h2>
+				<p class="hint"><b>the stretcher</b>, 200 × 50 — the good, run out on leader dots to its
+					quantity and measure.<br><b>the header</b>, 100 × 50 — the value of those same three
+					goods, flush right, on the same three lines.<br><b>the bed</b>, 200 × 100 — only the
+					topmost course carries it: the place, which printing it was read off, and the sum.<br>
+					<b>the far end</b>, 100 × 50, and <b>the back</b>, 200 × 50 — bare unless the place's
+					name is put on them, and then it repeats down every course of the stack, the way a
+					title repeats down the spines of a run of volumes.</p>
+				<p class="hint">Printed on <b>both sides</b> those two bare faces carry the next three
+					goods and their values instead, so a brick holds six and the stack comes out half as
+					high. Nothing is lost but the standing still: no one in front of it sees more than
+					half of what the place sent, and the name has nowhere left to go.</p>
+			</section>
+
+			<section>
+				<h2>the courses</h2>
+				<div class="courses" id="courses"></div>
+			</section>
+		</aside>
+	</main>
+
+	<div id="toast" class="toast"></div>
+
+	<script src="js/lib/three.min.js"></script>
+	<script src="data/handel-all.js"></script>
+	<script src="js/tafeln/model.js"></script>
+	<script src="js/tafeln/plate.js"></script>
+	<script src="js/tafeln/ink.js"></script>
+	<script src="js/stapel/faces.js"></script>
+	<script src="js/stapel/scene.js"></script>
+	<script src="js/stapel/ui.js"></script>
+</body>
+
+</html>

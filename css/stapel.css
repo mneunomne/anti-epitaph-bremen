@@ -1,0 +1,167 @@
+/* der Stapel — the yard. The chrome and the faces come from dashboard.css
+   and tafeln.css; what is here is the pit the stack stands in. */
+
+.yard {
+	padding: 0;
+	background: #171512;
+	position: relative;
+	overflow: hidden;
+}
+
+.yard canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+	max-width: none;
+	max-height: none;
+	box-shadow: none;
+	touch-action: none;
+}
+
+/* ---------------- the courses, listed ---------------- */
+
+.courses {
+	max-height: calc(100vh - 420px);
+	overflow-y: auto;
+	font-size: 11px;
+}
+
+.course {
+	display: flex;
+	gap: 8px;
+	padding: 4px 0;
+	border-bottom: 1px solid var(--line);
+}
+
+.course .c-n {
+	flex: none;
+	width: 18px;
+	color: var(--clay);
+	font-variant-numeric: tabular-nums;
+}
+
+.course .c-g {
+	flex: 1;
+	min-width: 0;
+}
+
+.course .c-g div {
+	display: flex;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.course .c-g span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.course .c-g b {
+	flex: none;
+	color: var(--dim);
+	font-weight: 400;
+	font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- colour wells ---------------- */
+
+input[type=color] {
+	width: 100%;
+	height: 24px;
+	padding: 1px;
+	background: var(--panel-2);
+	border: 1px solid var(--line);
+	cursor: pointer;
+}
+
+/* the count that matters in a yard: what would have to be carried to it */
+.stage-foot .tally b {
+	color: var(--clay);
+}
+
+/* ---------------- what is standing in the yard ----------------
+   these rules used to live in tafeln.css, next to the sheet that laid many
+   blocks out at once; that page now sets one block at a time, so they belong
+   here with the list of stacks instead. */
+
+.laid-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin: 8px 0 0;
+	max-height: 190px;
+	overflow-y: auto;
+}
+
+.laid-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 3px 6px;
+	border: 1px solid transparent;
+	font-size: 11px;
+}
+
+.laid-row:hover {
+	background: var(--panel-2);
+	border-color: var(--line);
+}
+
+.laid-row .nm {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.laid-row .pos {
+	flex: none;
+	color: var(--faint);
+	font-size: 10px;
+	font-variant-numeric: tabular-nums;
+}
+
+.laid-row .x {
+	flex: none;
+	border: 0;
+	background: none;
+	color: var(--faint);
+	padding: 0 3px;
+	cursor: pointer;
+}
+
+.laid-row .x:hover {
+	color: var(--failed);
+}
+
+/* a control whose face has been given to something else */
+#nameRow.spent {
+	opacity: .4;
+}
+
+.course .c-back {
+	color: var(--faint);
+	font-size: 10px;
+	letter-spacing: .08em;
+	padding-top: 2px;
+}
+
+/* the strike-out list runs long, so it gets its own scroll */
+.laid-list.tall {
+	max-height: 260px;
+}
+
+.laid-row.struck .nm {
+	text-decoration: line-through;
+	color: var(--faint);
+}
+
+.laid-row.struck .x {
+	color: var(--engraved);
+}
+
+.laid-row[data-strike] {
+	cursor: pointer;
+}
