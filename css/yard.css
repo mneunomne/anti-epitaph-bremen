@@ -1,0 +1,83 @@
+/* the yard — the pallet plan.
+   an extension of dashboard.css, not a replacement: same palette, same
+   density, the few pieces of furniture a wall never needed. */
+
+/* ---------------- image slots ---------------- */
+.slot {
+	border: 1px solid var(--line);
+	background: var(--panel-2);
+	padding: 8px;
+	margin-top: 8px;
+}
+
+.slot header {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+	margin-bottom: 4px;
+}
+
+.slot header b {
+	color: var(--clay);
+}
+
+.slot header span {
+	color: var(--faint);
+	font-size: 11px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.slot .thumb {
+	width: 100%;
+	height: 62px;
+	object-fit: cover;
+	display: block;
+	background: #000;
+	border: 1px solid var(--line);
+	margin-bottom: 4px;
+}
+
+.slot.over {
+	outline: 1px dashed var(--clay);
+	outline-offset: 3px;
+}
+
+.slot .mini {
+	display: flex;
+	gap: 4px;
+}
+
+.slot .mini button {
+	flex: 1;
+	font-size: 11px;
+	padding: 3px 4px;
+}
+
+/* ---------------- positions left bare ---------------- */
+.pool {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 3px;
+	max-height: 140px;
+	overflow-y: auto;
+}
+
+.pool span {
+	padding: 1px 5px;
+	border: 1px solid var(--line);
+	background: var(--panel-2);
+	font-size: 11px;
+	color: var(--dim);
+	cursor: pointer;
+}
+
+.pool span:hover {
+	border-color: var(--clay-dim);
+	color: var(--ink);
+}
+
+.pool span {
+	border-style: dashed;
+}

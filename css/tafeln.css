@@ -1,0 +1,169 @@
+/* die Tafeln — the composing stone.
+   The workshop chrome comes from dashboard.css; what is here is the two
+   faces the blocks are set in, and the furniture round the stone itself. */
+
+/* Ultra is the nearest free cut of the Fette Antiqua the volumes head their
+   blocks with — a true fat face, hairline serifs, the stress dead vertical.
+   Libre Bodoni is a Didone for the text and the figures, where Libre
+   Baskerville (a transitional) sat a century too early. Both self-hosted, so
+   the page keeps its face off-line and straight off disk. */
+@font-face {
+	font-family: 'Ultra';
+	font-style: normal;
+	font-weight: 400;
+	font-display: block;
+	src: url('../fonts/ultra-400.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Libre Bodoni';
+	font-style: normal;
+	font-weight: 400 700;
+	font-display: block;
+	src: url('../fonts/libre-bodoni-400.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Libre Bodoni';
+	font-style: italic;
+	font-weight: 400 700;
+	font-display: block;
+	src: url('../fonts/libre-bodoni-400i.woff2') format('woff2');
+}
+
+/* ---------------- the stone ---------------- */
+
+#stage {
+	cursor: default;
+	background: #fff;
+}
+
+#stage.grab {
+	cursor: grab;
+}
+
+#stage.grabbing {
+	cursor: grabbing;
+}
+
+#stage.resize {
+	cursor: nwse-resize;
+}
+
+.canvas-wrap.fitted {
+	place-items: start center;
+}
+
+/* ---------------- the places to hand ---------------- */
+
+.picker {
+	max-height: 300px;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-top: 6px;
+	padding-right: 2px;
+}
+
+.picker button {
+	display: flex;
+	justify-content: space-between;
+	gap: 10px;
+	align-items: baseline;
+	text-align: left;
+	width: 100%;
+	font-size: 11px;
+	padding: 4px 7px;
+}
+
+.picker button span.n {
+	color: var(--faint);
+	font-variant-numeric: tabular-nums;
+	flex: none;
+}
+
+.picker button.laid {
+	opacity: .42;
+}
+
+.picker button.laid span.n::after {
+	content: ' ✓';
+	color: var(--engraved);
+}
+
+/* ---------------- what is laid ---------------- */
+
+.laid-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.laid-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 6px;
+	border: 1px solid transparent;
+	cursor: pointer;
+}
+
+.laid-row:hover {
+	background: var(--panel-2);
+}
+
+.laid-row.on {
+	border-color: var(--clay-dim);
+	background: var(--panel-2);
+}
+
+.laid-row .nm {
+	flex: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.laid-row .pos {
+	color: var(--faint);
+	font-size: 10px;
+	flex: none;
+}
+
+.laid-row .x {
+	flex: none;
+	border: 0;
+	background: none;
+	color: var(--faint);
+	padding: 0 3px;
+	cursor: pointer;
+}
+
+.laid-row .x:hover {
+	color: var(--failed);
+}
+
+/* ---------------- the sheet's own scale ---------------- */
+
+.zoomrow {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.zoomrow input[type=range] {
+	flex: 1;
+}
+
+.zoomrow output {
+	min-width: 44px;
+	text-align: right;
+}
+
+.swatch {
+	font-family: 'Ultra', Georgia, serif;
+	font-size: 15px;
+	color: var(--ink);
+	letter-spacing: .02em;
+}

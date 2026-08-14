@@ -53,6 +53,22 @@
 		return lut;
 	}
 
+	// a seeded generator, deliberately not Math.random.
+	//
+	// a noisy dither has to give the same bitmap twice: the file you look
+	// at and the file you send a week later when the brick failed must be
+	// the same file, or there is no way to check anything. xorshift32 is
+	// cheap enough to call once per pixel.
+	function noiseFn(seed) {
+		let s = (seed || 1) >>> 0 || 1;
+		return () => {
+			s ^= s << 13; s >>>= 0;
+			s ^= s >> 17;
+			s ^= s << 5; s >>>= 0;
+			return s / 4294967296;
+		};
+	}
+
 	// grayscale, then optionally down to pure black and white.
 	// floyd–steinberg is what most laser software would do anyway; doing it
 	// here means what you see on screen is what the head will actually trace
@@ -73,15 +89,30 @@
 		}
 
 		const mode = laser.mode || 'grayscale';
+		const t = laser.threshold == null ? 128 : laser.threshold;
+		// how far the cut wanders either side of the threshold, 0..255
+		const spread = 255 * (laser.noise == null ? 100 : laser.noise) / 100;
+		const rnd = noiseFn(laser.seed || 1);
+
 		if (mode === 'threshold') {
-			const t = laser.threshold == null ? 128 : laser.threshold;
 			for (let p = 0; p < g.length; p++) g[p] = g[p] < t ? 0 : 255;
-		} else if (mode === 'dither') {
+		} else if (mode === 'random') {
+			// white noise: every pixel is decided on its own against a cut
+			// that moves, so there is no pattern to find — only grain. the
+			// average tone comes out right because the cut is uniform.
+			for (let p = 0; p < g.length; p++) g[p] = g[p] < t + (rnd() - 0.5) * spread ? 0 : 255;
+		} else if (mode === 'dither' || mode === 'scatter') {
+			// scatter is the same error diffusion with the decision point
+			// jittered. the error still gets carried forward, so the tone
+			// stays honest — what breaks up is the regular weave that
+			// floyd–steinberg leaves in flat areas.
+			const jitter = mode === 'scatter' ? spread : 0;
 			for (let y = 0; y < h; y++) {
 				for (let x = 0; x < w; x++) {
 					const p = y * w + x;
 					const old = g[p];
-					const nv = old < 128 ? 0 : 255;
+					const cut = jitter ? 128 + (rnd() - 0.5) * jitter : 128;
+					const nv = old < cut ? 0 : 255;
 					g[p] = nv;
 					const err = old - nv;
 					if (x + 1 < w) g[p + 1] += err * 7 / 16;
@@ -164,5 +195,5 @@
 		return c;
 	}
 
-	AE.Imaging = { canvas, crop, process, claySimulate, clayTexture, toBlob, fitCanvas, buildLUT };
+	AE.Imaging = { canvas, crop, process, claySimulate, clayTexture, toBlob, fitCanvas, buildLUT, noiseFn };
 })();

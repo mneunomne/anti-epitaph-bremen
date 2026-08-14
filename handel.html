@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Bremens Handel und Schifffahrt 1851</title>
+	<link rel="icon"
+		href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23efe6d4'/><rect x='2' y='3' width='12' height='2' fill='%231d1812'/><rect x='2' y='7' width='12' height='1' fill='%231d1812'/><rect x='2' y='10' width='8' height='1' fill='%231d1812'/><rect x='2' y='12' width='10' height='1' fill='%231d1812'/></svg>">
+	<link rel="preload" href="fonts/bevan-400.woff2" as="font" type="font/woff2" crossorigin>
+	<link rel="preload" href="fonts/libre-baskerville-400.woff2" as="font" type="font/woff2" crossorigin>
+	<link rel="stylesheet" href="css/handel.css">
+</head>
+
+<body>
+	<div class="sheet">
+
+		<header class="masthead">
+			<span class="folio" id="folio">22</span>
+			<span class="volume"><label class="field">Band <select id="yearSel"></select></label></span>
+			<h1>Bremens Handel und Schifffahrt<br><span class="thin">im Jahre <span id="theYear">1851</span></span></h1>
+			<p class="sub">Uebersicht der Ein- und Ausfuhr nach der Herkunft &middot; Werth in Louisd'or</p>
+			<hr class="rule-double">
+		</header>
+
+		<nav class="tabs" role="tablist">
+			<button role="tab" id="tab-karte" aria-controls="view-karte" aria-selected="true">Karte</button>
+			<button role="tab" id="tab-laender" aria-controls="view-laender" aria-selected="false">Länder</button>
+			<button role="tab" id="tab-waren" aria-controls="view-waren" aria-selected="false">Waren</button>
+			<button role="tab" id="tab-schiffe" aria-controls="view-schiffe" aria-selected="false">Schifffahrt</button>
+			<button role="tab" id="tab-quellen" aria-controls="view-quellen" aria-selected="false">Quellen</button>
+		</nav>
+
+		<!-- ============================================================ map -->
+		<section id="view-karte" role="tabpanel" aria-labelledby="tab-karte">
+			<div class="controls">
+				<div class="switch" id="dirSwitch">
+					<button data-dir="imports" aria-pressed="true">Einfuhr</button>
+					<button data-dir="exports" aria-pressed="false">Ausfuhr</button>
+				</div>
+				<div class="switch" id="weltSwitch">
+					<button data-welt="alle" aria-pressed="true">Alle Welt</button>
+					<button data-welt="uebersee" aria-pressed="false">Übersee</button>
+					<button data-welt="europa" aria-pressed="false">Europa</button>
+				</div>
+				<div class="switch" id="measureSwitch">
+					<button data-measure="value" aria-pressed="true">Werth</button>
+					<button data-measure="ships" aria-pressed="false">Schiffe</button>
+					<button data-measure="capacity" aria-pressed="false">Last</button>
+				</div>
+				<div class="legend" id="mapLegend"></div>
+				<label class="field">Waare
+					<input list="articleList" id="mapArticle" placeholder="alle Waaren" autocomplete="off">
+					<button type="button" class="clear hidden" id="mapArticleClear" title="Waare aufheben">×</button>
+				</label>
+				<span class="grow"></span>
+				<label class="field"><input type="checkbox" id="showRoutes" checked> Wege</label>
+				<label class="field"><input type="checkbox" id="showLabels" checked> Namen</label>
+			</div>
+
+			<div class="split">
+				<div class="mapwrap">
+					<div class="inner">
+						<svg class="map" id="map" role="img" aria-label="Karte der Herkunftsorte"></svg>
+					</div>
+					<div class="maptools">
+						<button id="zoomIn" title="näher">+</button>
+						<button id="zoomOut" title="weiter">−</button>
+						<button id="zoomReset" title="zurück">⟲</button>
+					</div>
+				</div>
+
+				<aside class="aside">
+					<p class="cap" id="asideCap">Einfuhr 1851</p>
+					<p class="hero" id="asideTotal">—<small>Louisd'or, Gesammt</small></p>
+					<h2 style="margin-top:14px">Die grössten Plätze</h2>
+					<div id="topList"></div>
+					<p class="note" style="margin-top:12px" id="mapNote">Die Kreisfläche folgt dem Werth.
+						Ein Klick öffnet den Platz.</p>
+				</aside>
+			</div>
+		</section>
+
+		<!-- ========================================================= länder -->
+		<section id="view-laender" role="tabpanel" aria-labelledby="tab-laender" class="hidden">
+			<div class="controls">
+				<div class="switch" id="dirSwitch2">
+					<button data-dir="imports" aria-pressed="true">Einfuhr</button>
+					<button data-dir="exports" aria-pressed="false">Ausfuhr</button>
+				</div>
+				<div class="switch" id="weltSwitch2">
+					<button data-welt="alle" aria-pressed="true">Alle Welt</button>
+					<button data-welt="uebersee" aria-pressed="false">Übersee</button>
+					<button data-welt="europa" aria-pressed="false">Europa</button>
+				</div>
+				<label class="field">Suche <input type="search" id="placeSearch" placeholder="Hannover, Cuba, …"></label>
+				<span class="grow"></span>
+				<div class="legend" id="tableLegend"></div>
+			</div>
+			<div class="frame">
+				<div class="inner">
+					<table class="ledger" id="placeTable"></table>
+				</div>
+			</div>
+			<p class="note" style="margin-top:8px">Nach der gedruckten Uebersicht der Total-Einfuhr bzw.
+				Total-Ausfuhr. Ein Strich — steht, wo das Original keine Ziffer führt.</p>
+		</section>
+
+		<!-- ========================================================== waren -->
+		<section id="view-waren" role="tabpanel" aria-labelledby="tab-waren" class="hidden">
+			<div class="controls">
+				<div class="switch" id="dirSwitch3">
+					<button data-dir="imports" aria-pressed="true">Einfuhr</button>
+					<button data-dir="exports" aria-pressed="false">Ausfuhr</button>
+				</div>
+				<div class="switch" id="weltSwitch3">
+					<button data-welt="alle" aria-pressed="true">Alle Welt</button>
+					<button data-welt="uebersee" aria-pressed="false">Übersee</button>
+					<button data-welt="europa" aria-pressed="false">Europa</button>
+				</div>
+				<label class="field">Suche <input type="search" id="articleSearch" placeholder="Kaffee, Taback, …"></label>
+				<label class="field">Platz
+					<select id="articlePlace">
+						<option value="">— alle Plätze —</option>
+					</select>
+				</label>
+				<span class="grow"></span>
+				<span class="note" id="articleCount"></span>
+			</div>
+			<div class="split">
+				<div class="frame">
+					<div class="inner">
+						<table class="ledger" id="articleTable"></table>
+					</div>
+				</div>
+				<aside class="aside">
+					<p class="cap">Gewählte Waare</p>
+					<h2 id="articleName">—</h2>
+					<div id="articleBreak"></div>
+					<p class="note" style="margin-top:12px">Aus den Waarenverzeichnissen der einzelnen Länder;
+						wo ein Platz dort fehlt, tritt die Einfuhr nach Artikeln ein. Beide führen dieselbe
+						Waare, darum gilt immer nur eine von beiden.</p>
+				</aside>
+			</div>
+		</section>
+
+		<!-- ===================================================== schifffahrt -->
+		<section id="view-schiffe" role="tabpanel" aria-labelledby="tab-schiffe" class="hidden">
+			<div class="controls">
+				<div class="switch" id="dirSwitch4">
+					<button data-dir="imports" aria-pressed="true">Angekommen</button>
+					<button data-dir="exports" aria-pressed="false">Abgegangen</button>
+				</div>
+				<div class="switch" id="weltSwitch4">
+					<button data-welt="alle" aria-pressed="true">Alle Welt</button>
+					<button data-welt="uebersee" aria-pressed="false">Übersee</button>
+					<button data-welt="europa" aria-pressed="false">Europa</button>
+				</div>
+				<label class="field">Suche <input type="search" id="portSearch" placeholder="Hannover, Cuba, …"></label>
+				<span class="grow"></span>
+				<span class="note" id="portCount"></span>
+			</div>
+			<div class="frame">
+				<div class="inner">
+					<table class="ledger" id="portTable"></table>
+				</div>
+			</div>
+			<p class="note" style="margin-top:8px">Nach dem gedruckten Seeschiffahrts-Verkehr: Seeschiffe
+				nach dem Platz, von dem sie kamen oder nach dem sie gingen — mit ihrer Ladungsfähigkeit,
+				ihrer Bemannung und dem Werth dessen, was sie führten.</p>
+		</section>
+
+		<!-- ======================================================== quellen -->
+		<section id="view-quellen" role="tabpanel" aria-labelledby="tab-quellen" class="hidden">
+			<div class="split">
+				<div class="panel">
+					<h2>Woher die Zahlen kommen</h2>
+					<p class="note">Jede Ziffer stammt aus <em>Bremens Handel und Schifffahrt im Jahre <span id="quellenYear">1851</span></em>,
+						Seite für Seite aus dem Faksimile gelesen. Die Werthe stehen in Louisd'or, wie gedruckt;
+						es ist nichts umgerechnet, nichts geglättet, nichts ergänzt. Wo das Original einen
+						Strich führt, steht auch hier ein Strich — nicht eine Null.</p>
+					<p class="note">Die Plätze sind auf heutige Koordinaten gelegt: Länder auf ihre Hauptstadt
+						oder auf den Hafen, über den der Verkehr lief, benannte Häfen auf den Hafen selbst.
+						Zusammenfassende Zeilen des Originals (Transport, TOTAL, Recapitulation) sind
+						ausgelassen, damit nichts doppelt zählt.</p>
+					<h2 style="margin-top:16px">Gelesene Seiten</h2>
+					<div id="pageList"></div>
+					<h2 style="margin-top:16px">Probe der Summen</h2>
+					<div id="totalCheck"></div>
+				</div>
+				<aside class="aside">
+					<p class="cap">Bestand</p>
+					<div id="counts"></div>
+					<p class="note" style="margin-top:12px">Die Auszüge wachsen, so lange die Bände laufen.
+						Neu erzeugen mit<br><code>python 04_bundle_site.py out/ gazetteer.json …/data/</code></p>
+				</aside>
+			</div>
+		</section>
+
+		<footer class="colophon">
+			<span>Bremens Handel und Schifffahrt &middot; <span id="footYear">1851</span></span>
+			<span><a href="index.html">the piece</a> &middot; <a href="layout.html">the pallets</a> &middot;
+				<a href="tafeln.html">die Tafeln</a> &middot;
+				<a href="engrave.html">wall desk</a></span>
+		</footer>
+	</div>
+
+	<datalist id="articleList"></datalist>
+	<div class="tip" id="tip" role="status" aria-live="polite"></div>
+	<div class="scrim" id="scrim"></div>
+	<aside class="drawer" id="drawer" aria-hidden="true">
+		<button class="close" id="drawerClose" aria-label="schliessen">×</button>
+		<header>
+			<h3 id="drawerTitle">—</h3>
+			<p id="drawerSub">—</p>
+		</header>
+		<div class="body" id="drawerBody"></div>
+	</aside>
+
+	<script src="js/lib/d3-array.min.js"></script>
+	<script src="js/lib/d3-geo.min.js"></script>
+	<script src="js/lib/topojson-client.min.js"></script>
+	<script src="data/world-110m.js"></script>
+	<script src="data/handel-all.js"></script>
+	<script src="js/handel/data.js"></script>
+	<script src="js/handel/map.js"></script>
+	<script src="js/handel/views.js"></script>
+	<script src="js/handel/app.js"></script>
+</body>
+
+</html>

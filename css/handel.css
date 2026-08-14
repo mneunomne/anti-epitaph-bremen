@@ -1,0 +1,924 @@
+/* Bremens Handel und Schifffahrt — a reading of the printed tables.
+   The page borrows the volumes' furniture: fat Egyptian display type, a
+   thick/thin frame around every table, leader dots, lining figures set
+   flush right. Paper first, screen second. */
+
+/* self-hosted, so the page keeps its face off-line and straight off disk.
+   Bevan stands in for the fat Egyptian of the printed headings; Libre
+   Baskerville (variable, 400–700) for the text and the figures. */
+@font-face {
+	font-family: 'Bevan';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('../fonts/bevan-400.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Libre Baskerville';
+	font-style: normal;
+	font-weight: 400 700;
+	font-display: swap;
+	src: url('../fonts/libre-baskerville-400.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Libre Baskerville';
+	font-style: italic;
+	font-weight: 400 700;
+	font-display: swap;
+	src: url('../fonts/libre-baskerville-400i.woff2') format('woff2');
+}
+
+:root {
+	--paper: #ffffff;
+	--paper-2: #f2f2f0;
+	--paper-3: #e6e6e3;
+	--ink: #000000;
+	--ink-2: #333333;
+	--ink-3: #6b6b6b;
+	--rule: #000000;
+	--hair: #b8b8b4;
+	--sepia: #1a1a1a;
+
+	/* Six goods categories with no colour to spend: three steps of grey and
+	   three engraved fills, alternating so no two neighbours in a stack share
+	   a treatment. Every fill is also named — in the legend, in the column
+	   heads, in the tooltip — so nothing is read off the texture alone. */
+	--cat-1: #111111;
+	--cat-2: repeating-linear-gradient(45deg, #111 0 1.5px, #fff 1.5px 4.5px);
+	--cat-3: #8f8f8c;
+	--cat-4: repeating-linear-gradient(135deg, #111 0 1.5px, #fff 1.5px 4.5px);
+	--cat-5: #d2d2ce;
+	--cat-6: repeating-linear-gradient(0deg, #111 0 1.5px, #fff 1.5px 4.5px);
+
+	--display: 'Bevan', 'Rockwell', 'Clarendon', Georgia, serif;
+	--text: 'Libre Baskerville', Georgia, 'Times New Roman', serif;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	height: 100%;
+}
+
+body {
+	margin: 0;
+	background: var(--paper);
+	color: var(--ink);
+	font-family: var(--text);
+	font-size: 13px;
+	line-height: 1.45;
+	font-variant-numeric: lining-nums tabular-nums;
+	-webkit-font-smoothing: antialiased;
+}
+
+a {
+	color: var(--sepia);
+}
+
+/* ---------------------------------------------------------------- head */
+
+.sheet {
+	max-width: 1240px;
+	margin: 0 auto;
+	padding: 22px 26px 60px;
+}
+
+.masthead {
+	text-align: center;
+	padding: 6px 0 0;
+}
+
+.masthead .folio {
+	float: left;
+	font-family: var(--display);
+	font-size: 15px;
+	line-height: 1;
+	margin-top: 6px;
+}
+
+.masthead .volume {
+	float: right;
+	margin-top: 2px;
+}
+
+.masthead .volume select {
+	min-width: 0;
+	font-size: 13px;
+}
+
+.masthead h1 {
+	font-family: var(--display);
+	font-weight: 400;
+	font-size: clamp(20px, 3.4vw, 38px);
+	line-height: 1.05;
+	letter-spacing: .01em;
+	margin: 0 0 2px;
+}
+
+.masthead h1 .thin {
+	font-family: var(--text);
+	font-weight: 700;
+	font-size: .62em;
+	letter-spacing: .02em;
+}
+
+.masthead .sub {
+	font-size: 11px;
+	letter-spacing: .16em;
+	text-transform: uppercase;
+	color: var(--ink-2);
+	margin: 4px 0 0;
+}
+
+/* the thick-over-thin rule the volumes set under every heading */
+.rule-double {
+	border: 0;
+	height: 0;
+	border-top: 3px solid var(--rule);
+	border-bottom: 1px solid var(--rule);
+	padding-top: 2px;
+	margin: 10px 0 0;
+}
+
+.rule-thin {
+	border: 0;
+	border-top: 1px solid var(--hair);
+	margin: 0;
+}
+
+/* ---------------------------------------------------------------- tabs */
+
+nav.tabs {
+	display: flex;
+	gap: 0;
+	align-items: stretch;
+	margin: 0 0 14px;
+	border-bottom: 1px solid var(--rule);
+	flex-wrap: wrap;
+}
+
+nav.tabs button {
+	appearance: none;
+	background: none;
+	border: 0;
+	border-right: 1px solid var(--hair);
+	font-family: var(--text);
+	font-size: 12px;
+	letter-spacing: .12em;
+	text-transform: uppercase;
+	color: var(--ink-2);
+	padding: 9px 18px;
+	cursor: pointer;
+	position: relative;
+	top: 1px;
+}
+
+nav.tabs button:first-child {
+	border-left: 1px solid var(--hair);
+}
+
+nav.tabs button:hover {
+	background: var(--paper-2);
+	color: var(--ink);
+}
+
+nav.tabs button[aria-selected="true"] {
+	font-family: var(--display);
+	letter-spacing: .02em;
+	text-transform: none;
+	font-size: 15px;
+	color: var(--ink);
+	background: var(--paper-2);
+	border-top: 3px solid var(--rule);
+	border-bottom: 1px solid var(--paper-2);
+	padding-top: 6px;
+}
+
+/* ------------------------------------------------------------ controls */
+
+.controls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px 18px;
+	padding: 10px 0 12px;
+}
+
+.controls .grow {
+	flex: 1;
+}
+
+.switch {
+	display: inline-flex;
+	border: 1px solid var(--rule);
+}
+
+.switch button {
+	appearance: none;
+	background: none;
+	border: 0;
+	border-right: 1px solid var(--rule);
+	font-family: var(--text);
+	font-size: 11px;
+	letter-spacing: .1em;
+	text-transform: uppercase;
+	padding: 6px 14px;
+	cursor: pointer;
+	color: var(--ink-2);
+}
+
+.switch button:last-child {
+	border-right: 0;
+}
+
+.switch button[aria-pressed="true"] {
+	background: var(--rule);
+	color: var(--paper);
+}
+
+.field {
+	display: inline-flex;
+	align-items: baseline;
+	flex: none;
+	gap: 6px;
+	font-size: 11px;
+	letter-spacing: .08em;
+	text-transform: uppercase;
+	color: var(--ink-2);
+}
+
+.field input:not([type=checkbox]),
+.field select {
+	font-family: var(--text);
+	font-size: 12px;
+	letter-spacing: 0;
+	text-transform: none;
+	color: var(--ink);
+	background: var(--paper);
+	border: 0;
+	border-bottom: 1px solid var(--rule);
+	padding: 3px 2px;
+	min-width: 150px;
+}
+
+.field input[type=checkbox] {
+	accent-color: var(--sepia);
+	margin: 0;
+}
+
+.field input:focus,
+.field select:focus {
+	outline: 2px solid var(--sepia);
+	outline-offset: 2px;
+}
+
+/* -------------------------------------------------------------- legend */
+
+.legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 6px;
+	align-items: center;
+}
+
+/* a control the current measure does not bear on — dim, do not remove */
+.field.is-off {
+	opacity: .35;
+	pointer-events: none;
+}
+
+.legend.is-off {
+	opacity: .35;
+	pointer-events: none;
+}
+
+.field .clear {
+	appearance: none;
+	border: 1px solid var(--hair);
+	background: var(--paper);
+	color: var(--ink);
+	font-family: var(--text);
+	font-size: 11px;
+	line-height: 1;
+	padding: 2px 5px;
+	cursor: pointer;
+	margin-left: -2px;
+}
+
+.field .clear:hover {
+	border-color: var(--rule);
+	background: var(--paper-2);
+}
+
+.legend-cap {
+	font-size: 10px;
+	letter-spacing: .14em;
+	text-transform: uppercase;
+	color: var(--ink-3);
+	margin-right: 2px;
+}
+
+.legend button.reset {
+	border-color: var(--rule);
+	color: var(--ink);
+	font-style: italic;
+}
+
+.legend button {
+	appearance: none;
+	background: none;
+	border: 1px solid transparent;
+	font-family: var(--text);
+	font-size: 11px;
+	color: var(--ink-2);
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 7px;
+	cursor: pointer;
+}
+
+.legend button:hover {
+	border-color: var(--hair);
+}
+
+.legend button[aria-pressed="true"] {
+	border-color: var(--rule);
+	color: var(--ink);
+	background: var(--paper-2);
+}
+
+.legend button[aria-pressed="false"]:not(.reset) {
+	opacity: .45;
+}
+
+.swatch {
+	width: 12px;
+	height: 12px;
+	border: 1px solid var(--ink);
+	flex: none;
+}
+
+/* -------------------------------------------------------------- tables */
+
+.frame {
+	border: 3px solid var(--rule);
+	padding: 3px;
+	background: var(--paper);
+}
+
+.frame>.inner {
+	border: 1px solid var(--rule);
+	overflow: auto;
+	max-height: 70vh;
+}
+
+table.ledger {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 12px;
+}
+
+table.ledger thead th {
+	position: sticky;
+	top: 0;
+	background: var(--paper-2);
+	border-bottom: 2px solid var(--rule);
+	border-right: 1px solid var(--hair);
+	font-size: 10px;
+	line-height: 1.2;
+	font-weight: 700;
+	letter-spacing: .04em;
+	padding: 7px 8px;
+	text-align: right;
+	vertical-align: bottom;
+	white-space: normal;
+	cursor: pointer;
+	z-index: 2;
+}
+
+table.ledger thead th:first-child {
+	text-align: left;
+	font-family: var(--display);
+	font-weight: 400;
+	font-size: 12px;
+	letter-spacing: .3em;
+}
+
+table.ledger thead th[aria-sort]::after {
+	content: ' ▾';
+	font-size: 9px;
+}
+
+table.ledger thead th[aria-sort="ascending"]::after {
+	content: ' ▴';
+}
+
+table.ledger tbody td {
+	border-right: 1px solid var(--hair);
+	border-bottom: 1px solid rgba(0, 0, 0, .18);
+	padding: 4px 8px;
+	text-align: right;
+	white-space: nowrap;
+}
+
+table.ledger tbody td:first-child {
+	text-align: left;
+	white-space: nowrap;
+}
+
+table.ledger tbody tr:hover td {
+	background: var(--paper-2);
+}
+
+table.ledger tbody tr.is-open td {
+	background: var(--paper-3);
+}
+
+table.ledger td.num {
+	font-variant-numeric: lining-nums tabular-nums;
+}
+
+table.ledger td.nil {
+	color: var(--ink-3);
+}
+
+table.ledger td.tot {
+	font-weight: 700;
+	border-left: 1px solid var(--rule);
+}
+
+table.ledger tfoot td {
+	border-top: 2px solid var(--rule);
+	padding: 6px 8px;
+	text-align: right;
+	font-weight: 700;
+	background: var(--paper-2);
+	position: sticky;
+	bottom: 0;
+}
+
+table.ledger tfoot td:first-child {
+	text-align: left;
+	font-family: var(--display);
+	font-weight: 400;
+}
+
+/* the printed leader dots between a name and its figures */
+.leader {
+	display: inline-flex;
+	align-items: baseline;
+	width: 100%;
+	gap: 6px;
+}
+
+.leader .nm {
+	flex: none;
+}
+
+.leader .dots {
+	flex: 1;
+	border-bottom: 1px dotted var(--hair);
+	transform: translateY(-3px);
+	min-width: 18px;
+}
+
+.place-btn {
+	appearance: none;
+	background: none;
+	border: 0;
+	padding: 0;
+	font: inherit;
+	color: inherit;
+	cursor: pointer;
+	text-align: left;
+	text-decoration: underline;
+	text-decoration-color: var(--hair);
+	text-underline-offset: 2px;
+}
+
+.place-btn:hover {
+	text-decoration-color: var(--sepia);
+	color: var(--sepia);
+}
+
+/* a hairline stacked bar inside a cell */
+.bar {
+	display: flex;
+	height: 9px;
+	width: 100%;
+	min-width: 90px;
+	gap: 2px;
+	/* the 2px surface gap between segments */
+	background: transparent;
+}
+
+.bar span {
+	display: block;
+	height: 100%;
+	/* an engraved block is outlined, and the pale fills need it to show at all */
+	box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+/* ---------------------------------------------------------------- grid */
+
+.split {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 320px;
+	gap: 18px;
+	align-items: start;
+}
+
+@media (max-width: 900px) {
+	.split {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+.panel h2,
+.aside h2 {
+	font-family: var(--display);
+	font-weight: 400;
+	font-size: 15px;
+	margin: 0 0 6px;
+}
+
+.aside {
+	border-top: 3px solid var(--rule);
+	padding-top: 8px;
+}
+
+.aside .cap {
+	font-size: 10px;
+	letter-spacing: .14em;
+	text-transform: uppercase;
+	color: var(--ink-3);
+	margin: 0 0 8px;
+}
+
+.stat {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 10px;
+	border-bottom: 1px dotted var(--hair);
+	padding: 3px 0;
+	font-size: 12px;
+}
+
+.stat b {
+	font-weight: 700;
+}
+
+.hero {
+	font-family: var(--display);
+	font-size: 30px;
+	line-height: 1;
+	margin: 2px 0 0;
+}
+
+.hero small {
+	font-family: var(--text);
+	font-size: 11px;
+	letter-spacing: .12em;
+	text-transform: uppercase;
+	color: var(--ink-3);
+	display: block;
+	margin-top: 4px;
+}
+
+/* ----------------------------------------------------------------- map */
+
+.mapwrap {
+	position: relative;
+	border: 3px solid var(--rule);
+	padding: 3px;
+	background: var(--paper);
+}
+
+.mapwrap .inner {
+	border: 1px solid var(--rule);
+	background: var(--paper-2);
+	overflow: hidden;
+}
+
+svg.map {
+	display: block;
+	width: 100%;
+	height: 560px;
+	cursor: grab;
+	touch-action: none;
+}
+
+svg.map.dragging {
+	cursor: grabbing;
+}
+
+svg.map .sphere {
+	fill: var(--paper);
+	stroke: var(--ink);
+	stroke-width: 1;
+}
+
+svg.map .graticule {
+	fill: none;
+	stroke: var(--hair);
+	stroke-width: .5;
+	stroke-opacity: .7;
+}
+
+svg.map .land {
+	fill: var(--paper-3);
+	stroke: var(--ink);
+	stroke-width: .5;
+	stroke-linejoin: round;
+}
+
+svg.map .route {
+	fill: none;
+	stroke: var(--sepia);
+	stroke-linecap: round;
+}
+
+svg.map .node {
+	cursor: pointer;
+}
+
+svg.map .node circle.hit {
+	fill: transparent;
+	stroke: none;
+}
+
+svg.map .node circle.disc {
+	fill: rgba(0, 0, 0, .22);
+	stroke: var(--paper);
+	stroke-width: 2;
+	/* the 2px surface ring on overlapping marks */
+	paint-order: stroke;
+}
+
+svg.map .node circle.rim {
+	fill: none;
+	stroke: var(--ink);
+	stroke-width: 1;
+}
+
+svg.map .node:hover circle.disc,
+svg.map .node:focus circle.disc,
+svg.map .node.is-on circle.disc {
+	fill: rgba(0, 0, 0, .5);
+}
+
+svg.map .node:hover circle.rim,
+svg.map .node:focus circle.rim,
+svg.map .node.is-on circle.rim {
+	stroke-width: 2;
+}
+
+svg.map .node:focus {
+	outline: none;
+}
+
+svg.map .home circle {
+	fill: var(--rule);
+	stroke: var(--paper);
+	stroke-width: 2;
+}
+
+svg.map text.label {
+	font-family: var(--text);
+	font-size: 10px;
+	fill: var(--ink);
+	paint-order: stroke;
+	stroke: var(--paper);
+	stroke-width: 3px;
+	stroke-linejoin: round;
+	pointer-events: none;
+}
+
+svg.map text.homelabel {
+	font-family: var(--display);
+	font-size: 12px;
+	fill: var(--ink);
+	paint-order: stroke;
+	stroke: var(--paper);
+	stroke-width: 3.5px;
+	pointer-events: none;
+}
+
+.maptools {
+	position: absolute;
+	right: 12px;
+	top: 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.maptools button {
+	width: 26px;
+	height: 26px;
+	border: 1px solid var(--rule);
+	background: var(--paper);
+	font-family: var(--text);
+	font-size: 14px;
+	line-height: 1;
+	cursor: pointer;
+	color: var(--ink);
+}
+
+.maptools button:hover {
+	background: var(--paper-3);
+}
+
+/* ------------------------------------------------------------- tooltip */
+
+.tip {
+	position: fixed;
+	z-index: 40;
+	pointer-events: none;
+	background: var(--paper);
+	border: 1px solid var(--rule);
+	box-shadow: 3px 3px 0 rgba(0, 0, 0, .3);
+	padding: 8px 10px;
+	font-size: 11px;
+	max-width: 280px;
+	opacity: 0;
+	transition: opacity .08s linear;
+}
+
+.tip.on {
+	opacity: 1;
+}
+
+.tip h4 {
+	font-family: var(--display);
+	font-weight: 400;
+	font-size: 13px;
+	margin: 0 0 4px;
+}
+
+.tip table {
+	border-collapse: collapse;
+	width: 100%;
+}
+
+.tip td {
+	padding: 1px 0;
+	font-size: 11px;
+}
+
+.tip td:last-child {
+	text-align: right;
+	padding-left: 12px;
+	font-variant-numeric: lining-nums tabular-nums;
+}
+
+.tip .key {
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	margin-right: 5px;
+	border: 1px solid rgba(0, 0, 0, .35);
+}
+
+.tip .foot {
+	margin-top: 5px;
+	padding-top: 4px;
+	border-top: 1px solid var(--hair);
+	color: var(--ink-3);
+	font-size: 10px;
+	letter-spacing: .06em;
+	text-transform: uppercase;
+}
+
+/* -------------------------------------------------------------- drawer */
+
+.drawer {
+	position: fixed;
+	inset: 0 0 0 auto;
+	width: min(520px, 94vw);
+	background: var(--paper);
+	border-left: 3px solid var(--rule);
+	box-shadow: -6px 0 24px rgba(0, 0, 0, .22);
+	transform: translateX(100%);
+	transition: transform .18s ease-out;
+	z-index: 50;
+	display: flex;
+	flex-direction: column;
+}
+
+.drawer.on {
+	transform: none;
+}
+
+.drawer header {
+	padding: 14px 18px 10px;
+	border-bottom: 3px solid var(--rule);
+}
+
+.drawer header h3 {
+	font-family: var(--display);
+	font-weight: 400;
+	font-size: 20px;
+	margin: 0;
+	padding-right: 30px;
+}
+
+.drawer header p {
+	margin: 4px 0 0;
+	font-size: 11px;
+	letter-spacing: .1em;
+	text-transform: uppercase;
+	color: var(--ink-3);
+}
+
+.drawer .body {
+	overflow: auto;
+	padding: 12px 18px 24px;
+}
+
+.drawer .close {
+	position: absolute;
+	right: 12px;
+	top: 12px;
+	width: 26px;
+	height: 26px;
+	border: 1px solid var(--rule);
+	background: var(--paper);
+	cursor: pointer;
+	font-size: 14px;
+	line-height: 1;
+	color: var(--ink);
+}
+
+.scrim {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, .3);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity .18s;
+	z-index: 45;
+}
+
+.scrim.on {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+/* --------------------------------------------------------------- misc */
+
+.note {
+	font-size: 11px;
+	color: var(--ink-3);
+	line-height: 1.5;
+}
+
+.note code {
+	font-family: var(--text);
+	background: var(--paper-2);
+	padding: 0 3px;
+}
+
+footer.colophon {
+	margin-top: 30px;
+	border-top: 3px solid var(--rule);
+	padding-top: 8px;
+	display: flex;
+	justify-content: space-between;
+	gap: 20px;
+	flex-wrap: wrap;
+	font-size: 10px;
+	letter-spacing: .1em;
+	text-transform: uppercase;
+	color: var(--ink-3);
+}
+
+.hidden {
+	display: none !important;
+}
+
+.empty {
+	padding: 40px;
+	text-align: center;
+	color: var(--ink-3);
+	font-size: 12px;
+}
+
+@media print {
+	nav.tabs,
+	.controls,
+	.maptools {
+		display: none;
+	}
+
+	body {
+		background: #fff;
+	}
+}
