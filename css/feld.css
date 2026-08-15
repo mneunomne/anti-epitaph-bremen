@@ -1,0 +1,27 @@
+/* das Feld — what differs from der Stapel.
+   The yard, the panels and the faces are the same; the list at the foot of
+   the side is not. On der Stapel it counts courses, so its gutter holds a
+   number and is 18px wide. Here every entry is a place, so the gutter has to
+   hold a name. */
+
+#courses .c-n {
+	width: auto;
+	flex: none;
+	max-width: 96px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-variant-numeric: normal;
+}
+
+/* the picker says how much of a place is actually standing — "3 of 25" —
+   which is a wider count than der Stapel's, and wants room not to wrap */
+#picker .n {
+	white-space: nowrap;
+}
+
+/* the whole point of the page is the cut, so the reckoning of it is not a
+   throwaway line */
+#share {
+	color: var(--clay);
+}

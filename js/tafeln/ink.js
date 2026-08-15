@@ -13,7 +13,10 @@
  * vanish the moment the block was exported. This is the same three steps
  * done to the pixels, so what leaves the page is what was on screen.
  *
- * The block is black on white, so only one channel is ever read.
+ * A block is black on white, but a brick is black on clay, and running one
+ * through a press written for paper threw its colour away with the grey. So
+ * the two colours the face was drawn in are given to it, the tone is worked
+ * out between them, and it is laid back down between them.
  */
 (function (global) {
 	'use strict';
@@ -30,7 +33,22 @@
 		dust: 0.35,   // stray specks in the white
 		soft: 0.10,   // how hard the edge comes down
 		seed: 1847,
+		// what the face was drawn in — the tone is read and laid back down
+		// between these two, so a clay brick comes off the press still clay
+		inkColour: '#000000',
+		paperColour: '#ffffff',
 	};
+
+	// '#rgb' or '#rrggbb' to three numbers; anything else is taken for black
+	function rgb(c) {
+		const h = String(c || '').replace('#', '').trim();
+		const t = h.length === 3 ? h.split('').map(d => d + d).join('') : h;
+		const n = parseInt(t, 16);
+		return t.length === 6 && Number.isFinite(n)
+			? { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }
+			: { r: 0, g: 0, b: 0 };
+	}
+	const lum = c => (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) / 255;
 
 	/* --------------------------------------------------------------- noise */
 
@@ -109,9 +127,16 @@
 		const img = ctx.getImageData(0, 0, w, h);
 		const px = img.data;
 
-		// the drawn block, one channel, 0..1 with 1 = paper
+		// The drawn face, 0..1 with 1 = paper — read as the distance between
+		// the two colours it was drawn in rather than as a grey, so that the
+		// threshold falls in the same place whatever the face is printed on.
+		const INK = rgb(o.inkColour), PAPER = rgb(o.paperColour);
+		const li = lum(INK), span = (lum(PAPER) - li) || 1;
 		const src = new Float32Array(w * h);
-		for (let i = 0, p = 0; i < src.length; i++, p += 4) src[i] = px[p] / 255;
+		for (let i = 0, p = 0; i < src.length; i++, p += 4) {
+			const v = ((0.299 * px[p] + 0.587 * px[p + 1] + 0.114 * px[p + 2]) / 255 - li) / span;
+			src[i] = v < 0 ? 0 : v > 1 ? 1 : v;
+		}
 
 		const cell = Math.max(1.2, o.coarse * s);
 		const dx = turbulence(w, h, cell, o.seed);
@@ -203,8 +228,9 @@
 					if (r < rate) out *= 0.25 + 0.55 * hash01((x / gsz) | 0, gy, o.seed + 1);
 				}
 
-				const g = out * 255;
-				px[p] = px[p + 1] = px[p + 2] = g;
+				px[p] = INK.r + (PAPER.r - INK.r) * out;
+				px[p + 1] = INK.g + (PAPER.g - INK.g) * out;
+				px[p + 2] = INK.b + (PAPER.b - INK.b) * out;
 				px[p + 3] = 255;
 			}
 		}

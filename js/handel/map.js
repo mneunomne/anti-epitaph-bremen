@@ -260,7 +260,7 @@
 			g.append(t);
 		}
 		const cap = el('text', { class: 'label', x: bx, y: by + 12 });
-		cap.textContent = this.unit || "Werth in Ld'or";
+		cap.textContent = this.unit || "Werth";
 		g.append(cap);
 		this.gLabels.append(g);
 	};

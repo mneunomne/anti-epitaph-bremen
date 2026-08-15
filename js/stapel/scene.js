@@ -107,7 +107,13 @@
 
 		orbit(canvas);
 		resize();
+		// The yard is a cell in a grid, and a grid settles after the fonts and
+		// the panels are in — long after the window has finished resizing. A
+		// window listener alone misses that, and the drawing buffer is left at
+		// whatever size the cell happened to be at boot, stretched by the CSS
+		// to whatever size it ended at. So the element itself is watched.
 		global.addEventListener('resize', resize);
+		if (global.ResizeObserver) new ResizeObserver(resize).observe(wrap);
 		tick();
 	}
 
@@ -221,7 +227,7 @@
 		const g = new THREE.Group();
 		const rows = Math.max(1, o.rows | 0);
 		const two = o.sides === 2;
-		const cs = F.courses(plate, rows, o.sides);
+		const cs = F.courses(plate, rows, o.sides, o.maxBricks, o.heads);
 		const gap = o.gap || 0;
 		const h = B.h + gap;
 		const foot = o.pallet ? PAL.h : 0;      // the deck the first course sits on
@@ -231,11 +237,14 @@
 		// and the one material hung on all of them — a stack of thirty courses
 		// costs one nameplate, not thirty
 		// printing on both sides takes the two faces the name would have gone on
-		const nameOn = two ? 'none' : (o.nameOn || 'none');
+		// — unless the values have gone round onto the stretcher with their
+		// goods, which gives both ends back
+		const oneFace = o.figuresOn === 'stretcher';
+		const nameOn = (two && !oneFace) ? 'none' : (o.nameOn || 'none');
 		const endName = (nameOn === 'end' || nameOn === 'both')
-			? mat(F.nameplate(plate, B.d, B.h, o)) : null;
+			? mat(F.nameplate(plate, B.d, B.h, Object.assign({}, o, { tag: F.tagFor(plate, '', 'e') }))) : null;
 		const backName = (nameOn === 'back' || nameOn === 'both')
-			? mat(F.nameplate(plate, B.l, B.h, o)) : null;
+			? mat(F.nameplate(plate, B.l, B.h, Object.assign({}, o, { tag: F.tagFor(plate, '', 'd') }))) : null;
 
 		for (let i = 0; i < cs.length; i++) {
 			const load = cs[i];
@@ -252,13 +261,21 @@
 			// stack comes out half as high for the same reading.
 			const faces = o.everyFace !== false;
 			const back = two && load.back.length;
+			// a stack is one table and has one head — the top course carries it
+			const base = load.head ? o : Object.assign({}, o, { top: false });
+			// and every printed side carries its own mark: the brick counting
+			// down from the top, and b c d e round the four sides from the
+			// stretcher in view. The bed is a, and is obviously itself.
+			const fo = l => Object.assign({}, base, { tag: F.tagFor(plate, i + 1, l) });
+			// with the values on the stretcher the header carries nothing, and
+			// the one shared blank does for every brick in the yard
 			const mats = [
-				faces ? mat(F.header(load.front, o)) : blank(B.d, B.h, o),
-				back && faces ? mat(F.header(load.back, o)) : (endName || blank(B.d, B.h, o)),
+				faces && !oneFace ? mat(F.header(load.front, fo('c'))) : blank(B.d, B.h, o),
+				back && faces && !oneFace ? mat(F.header(load.back, fo('e'))) : (endName || blank(B.d, B.h, o)),
 				top && o.bedOn !== 'none' ? mat(F.bed(plate, o)) : blank(B.l, B.d, o),
 				blank(B.l, B.d, o),
-				faces ? mat(F.stretcher(load.front, o)) : blank(B.l, B.h, o),
-				back && faces ? mat(F.stretcher(load.back, o)) : (backName || blank(B.l, B.h, o)),
+				faces ? mat(F.stretcher(load.front, fo('b'))) : blank(B.l, B.h, o),
+				back && faces ? mat(F.stretcher(load.back, fo('d'))) : (backName || blank(B.l, B.h, o)),
 			];
 
 			const brick = new THREE.Mesh(geo.clone(), mats);
@@ -279,6 +296,16 @@
 		g.userData.height = foot + cs.length * B.h + (cs.length - 1) * gap;
 		return g;
 	}
+
+	// A stack is one way of standing a place up and not the only one. Here the
+	// height is the count of goods; on das Feld every place gets the same one
+	// or two bricks and carries only its largest goods, so the field says how
+	// many places there were and nothing about how much each sent. The yard,
+	// the ground, the camera and the layout are the same either way, so the
+	// brick-builder is the single thing that swaps out.
+	let builder = stack;
+	const KIT = { MM, B, PAL, mat, blank };
+	const setBuilder = fn => { builder = fn || stack; };
 
 	// a small seeded generator, so the same scatter comes back every time
 	function rng(seed) {
@@ -305,9 +332,16 @@
 		let maxH = 0, courses = 0, tallest = 0;
 		let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
 
+		// A row is centred on what actually stands in it, not on how wide the
+		// field was asked to be. One stack under a four-column setting is one
+		// stack in the middle of the yard, not a stack in the first of four
+		// columns with three empty ones beside it and the camera looking at
+		// the gap; the same goes for whatever is left over on the last row.
+		const inRow = row => Math.max(1, Math.min(cols, n - row * cols));
+
 		for (let i = 0; i < n; i++) {
 			const col = i % cols, row = (i / cols) | 0;
-			const g = stack(plates[i], o);
+			const g = builder(plates[i], o, KIT);
 
 			// odd rows shove over by a share of a cell, which is what breaks
 			// the grid into the scatter the drawing has
@@ -315,7 +349,7 @@
 			const jx = L.jitter ? (rand() * 2 - 1) * L.jitter : 0;
 			const jz = L.jitter ? (rand() * 2 - 1) * L.jitter : 0;
 
-			const x = (col - (cols - 1) / 2) * cellW + off + jx;
+			const x = (col - (inRow(row) - 1) / 2) * cellW + off + jx;
 			const z = (row - (rowsOf - 1) / 2) * cellD + jz;
 			g.position.set(x * MM, 0, z * MM);
 			if (L.turn) g.rotation.y = (rand() * 2 - 1) * L.turn * Math.PI / 180;
@@ -353,6 +387,13 @@
 
 	/* --------------------------------------------------------------- camera */
 
+	// How much air to leave round the yard when standing back from it. A yard
+	// of stacks is roughly as tall as it is wide and wants the room; a field
+	// one brick high is nearly flat, and the same allowance leaves it a smudge
+	// in the middle of the frame. So the page says which it is.
+	let framePad = 1.55;
+	const setFramePad = p => { framePad = p > 0 ? p : 1.55; };
+
 	// stand back far enough to see the whole yard, and look at its middle
 	function frame() {
 		const hU = built.height * MM;
@@ -366,7 +407,7 @@
 			frustum();
 		} else {
 			const span = Math.max(hU, w, d) * 1.05;
-			cam.dist = span / (2 * Math.tan(persp.fov * Math.PI / 360)) * 1.55;
+			cam.dist = span / (2 * Math.tan(persp.fov * Math.PI / 360)) * framePad;
 		}
 	}
 
@@ -410,6 +451,7 @@
 
 	S.Scene = {
 		init, build, frame, view, snapshot, resize, isFlat, PAL, placement, fitToPallet,
+		setBuilder, setFramePad,
 		get built() { return built; }, MM, cam,
 	};
 })(window);

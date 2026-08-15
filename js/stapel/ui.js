@@ -12,7 +12,9 @@
 	const { Model, Plate, Ink } = AE.Tafeln;
 	const { Faces, Scene } = AE.Stapel;
 	const $ = id => document.getElementById(id);
-	const KEY = 'ae.stapel.v2';
+	// v3: the settings became overrides on faces.js rather than copies of it,
+	// so an older save would go on overriding what faces.js now says
+	const KEY = 'ae.stapel.v3';
 
 	let list = [], data = new Map();
 
@@ -23,13 +25,20 @@
 		many: false,
 		rows: 3, gap: 2, outline: true, everyFace: true, nameOn: 'none',
 		sides: 1, bedOn: 'full', pallet: false, order: 'werth',
-		titleSize: 21, nameSize: 23,
+		maxBricks: 12,          // 0 stands for as many as the place has goods
+		nameSize: 23,
+		// Overrides on faces.js, nothing more. What is not here is whatever
+		// faces.js says today, so a decision taken there arrives on its own.
+		face: {}, bed: {},
 		clay: '#d98741', ink: '#12100e',
-		display: 'ultra', text: 'libre-bodoni',
 		ppmm: 8,
+		exScope: 'one', exPpmm: 24, exGround: 'clay',
 		layout: { cols: 4, gapX: 120, gapZ: 120, stagger: 0, jitter: 0, turn: 0, seed: 7 },
-		press: Object.assign({}, Ink.DEFAULTS, { on: false, bite: 0.5, grain: 0.07, dust: 0.2 }),
+		// overrides on ink.js, the same way the faces are overrides on faces.js
+		press: { on: false },
 	};
+
+	const { FACE, BED, WEIGHTS } = AE.Stapel.Panel;
 
 	const num = (v, fb) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : fb);
 	const esc = s => String(s == null ? '' : s)
@@ -70,15 +79,24 @@
 		return ps;                                   // as picked
 	}
 
-	const faceOpts = () => ({
+	const faceOpts = () => Object.assign({
 		ppmm: S.ppmm, rows: S.rows, clay: S.clay, ink: S.ink,
-		display: S.display, text: S.text,
 		gap: S.gap, outline: S.outline, everyFace: S.everyFace, nameOn: S.nameOn,
-		sides: S.sides, bedOn: S.bedOn, pallet: S.pallet,
-		titleSize: S.titleSize, nameSize: S.nameSize,
+		sides: S.sides, bedOn: S.bedOn, pallet: S.pallet, maxBricks: S.maxBricks,
+		nameSize: S.nameSize,
 		layout: S.layout,
-		press: S.press.on ? S.press : null,
-	});
+		press: S.press.on ? Object.assign({}, Ink.DEFAULTS, S.press) : null,
+	}, S.face, S.bed);
+
+	/* --------------------------------------------------------- the panels */
+
+	function panels() {
+		const Panel = AE.Stapel.Panel;
+		const redraw = () => { stand(false); save(); };
+		Panel.build('p_face', FACE, 'face', S.face, redraw);
+		Panel.build('p_bed', BED, 'bed', S.bed, redraw);
+		Panel.build('p_press', Panel.PRESS, 'press', S.press, redraw, Ink.DEFAULTS);
+	}
 
 	/* ---------------------------------------------------------------- data */
 
@@ -127,6 +145,7 @@
 				: '') +
 			`<span class="${mb > 400 ? 'bad' : mb > 200 ? 'warn' : ''}">${b.textures} faces · ${mb.toFixed(0)} MB</span>`;
 		side();
+		exFoot();
 	}
 
 	/* ---------------------------------------------------------------- side */
@@ -150,7 +169,7 @@
 		const on = new Set(S.places);
 		const rows = list.filter(p => !q || p.title.toLowerCase().includes(q));
 		$('picker').innerHTML = rows.map(p => {
-			const cs = Math.ceil(p.rows.length / (S.rows * S.sides)) || 1;
+			const cs = Faces.courses(p, S.rows, S.sides, S.maxBricks, faceOpts().heads).length;
 			return `<button data-pick="${esc(p.id)}" class="${on.has(p.id) ? 'on' : ''}">` +
 				`<span>${esc(p.title)}</span>` +
 				`<span class="n">${p.rows.length} · ${cs}c</span></button>`;
@@ -200,9 +219,12 @@
 
 	function side() {
 		const ps = chosen();
-		// with both sides printed there is no bare face left for the name
-		$('nameOn').disabled = S.sides === 2;
-		$('nameRow').classList.toggle('spent', S.sides === 2);
+		// with both sides printed there is no bare face left for the name —
+		// unless the Werth has gone round onto the stretcher, which gives the
+		// two ends back
+		const spent = S.sides === 2 && faceOpts().figuresOn !== 'stretcher';
+		$('nameOn').disabled = spent;
+		$('nameRow').classList.toggle('spent', spent);
 		$('placeName').textContent = S.many
 			? (ps.length === 1 ? ps[0].title : `${ps.length} places`)
 			: (ps[0] ? ps[0].title : '—');
@@ -221,7 +243,7 @@
 
 		const p = ps[0];
 		if (!p) return;
-		const cs = Faces.courses(p, S.rows, S.sides);
+		const cs = Faces.courses(p, S.rows, S.sides, S.maxBricks, faceOpts().heads);
 		const line = r => `<div><span>${esc(r.article)}</span><b>${Model.figure(r.value)}</b></div>`;
 		$('courses').innerHTML = cs.map((load, i) =>
 			`<div class="course"><span class="c-n">${i + 1}</span><div class="c-g">` +
@@ -229,6 +251,110 @@
 			(load.back.length ? `<div class="c-back">— the back —</div>` + load.back.map(line).join('') : '') +
 			`</div></div>`
 		).join('');
+	}
+
+	/* --------------------------------------------------------- as files */
+
+	// Every printed side of a stack, in the order it would be laid out to
+	// print: course by course from the top down, the bed with the course that
+	// carries it, and the name last because it is one drawing hung on all of
+	// them rather than one a course. A face with nothing on it is not a file —
+	// the yard shares a single blank across every brick in it, and a folder of
+	// identical empty pngs would say nothing.
+	function facesOf(plate, o) {
+		const B = Faces.BRICK;
+		const cs = Faces.courses(plate, Math.max(1, o.rows | 0), o.sides, o.maxBricks, o.heads);
+		const two = o.sides === 2;
+		const oneFace = o.figuresOn === 'stretcher';
+		const nameOn = (two && !oneFace) ? 'none' : (o.nameOn || 'none');
+		const out = [];
+
+		cs.forEach((load, i) => {
+			const c = 'c' + (i + 1);
+			// the same options and the same marks the yard would give this
+			// course, so a file and a brick cannot disagree
+			const base = load.head ? o : Object.assign({}, o, { top: false });
+			const fo = l => Object.assign({}, base, { tag: Faces.tagFor(plate, i + 1, l) });
+
+			out.push([`${c}-stretcher`, () => Faces.stretcher(load.front, fo('b'))]);
+			if (!oneFace) out.push([`${c}-header`, () => Faces.header(load.front, fo('c'))]);
+			if (two && load.back.length) {
+				out.push([`${c}-stretcher-back`, () => Faces.stretcher(load.back, fo('d'))]);
+				if (!oneFace) out.push([`${c}-header-back`, () => Faces.header(load.back, fo('e'))]);
+			}
+			// the top. Only the topmost course shows one in a yard — the rest are
+			// under a brick — so it comes off once. A stack standing without a bed
+			// still has a top to print, so the export sets it as it would be set
+			// rather than writing a bare face.
+			if (i === 0) {
+				const bed = o.bedOn === 'none' ? Object.assign({}, o, { bedOn: 'full' }) : o;
+				out.push([`${c}-bed`, () => Faces.bed(plate, bed)]);
+			}
+		});
+
+		// the name is one drawing hung on every course, and those courses are
+		// interchangeable, so its mark names the face and not a brick
+		if (nameOn === 'end' || nameOn === 'both')
+			out.push(['name-end', () => Faces.nameplate(plate, B.d, B.h,
+				Object.assign({}, o, { tag: Faces.tagFor(plate, '', 'e') }))]);
+		if (nameOn === 'back' || nameOn === 'both')
+			out.push(['name-back', () => Faces.nameplate(plate, B.l, B.h,
+				Object.assign({}, o, { tag: Faces.tagFor(plate, '', 'd') }))]);
+		return out;
+	}
+
+	// what the export is about to write, so the button can say so before it is
+	// pressed rather than after
+	const exPlates = () => (S.exScope === 'all' ? ordered() : chosen().slice(0, 1));
+	function exCount() {
+		const o = faceOpts();
+		return exPlates().reduce((n, p) => n + facesOf(p, o).length, 0);
+	}
+
+	async function exportFaces() {
+		// the clay is the brick, not the printing — on paper the same face wants
+		// the white the volumes are printed on, so the ground is the export's own
+		const o = Object.assign(faceOpts(), {
+			ppmm: S.exPpmm,
+			clay: S.exGround === 'white' ? '#ffffff' : S.clay,
+		});
+		const ps = exPlates();
+		if (!ps.length) return;
+
+		const btn = $('exportFaces');
+		btn.disabled = true;
+		let n = 0, total = ps.reduce((s, p) => s + facesOf(p, o).length, 0);
+		for (const plate of ps) {
+			for (const [name, make] of facesOf(plate, o)) {
+				const canvas = make();
+				const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+				const a = document.createElement('a');
+				a.href = URL.createObjectURL(blob);
+				a.download = `bremen-${S.year}-${plate.id}-${name}-${canvas.width}x${canvas.height}.png`;
+				a.click();
+				setTimeout(() => URL.revokeObjectURL(a.href), 8000);
+				// the canvas is a few million pixels and there may be a hundred of
+				// them; letting go of each one and giving the browser a beat to
+				// take the download is what keeps a long export standing up
+				canvas.width = canvas.height = 0;
+				btn.textContent = `writing ${++n} of ${total}…`;
+				await new Promise(r => setTimeout(r, 140));
+			}
+		}
+		btn.disabled = false;
+		exFoot();
+		toast(`${total} png${total === 1 ? '' : 's'} at ${S.exPpmm} px/mm`);
+	}
+
+	// what a face comes out as at the fineness asked for, and how many there are
+	function exFoot() {
+		const px = mm => Math.round(mm * S.exPpmm);
+		const n = exCount();
+		$('exSize').textContent =
+			`a stretcher ${px(Faces.BRICK.l)} × ${px(Faces.BRICK.h)} px · ` +
+			`a header ${px(Faces.BRICK.d)} × ${px(Faces.BRICK.h)} · ` +
+			`a bed ${px(Faces.BRICK.l)} × ${px(Faces.BRICK.d)}`;
+		$('exportFaces').textContent = `export the faces — ${n} file${n === 1 ? '' : 's'}`;
 	}
 
 	/* ------------------------------------------------------------------ ui */
@@ -334,6 +460,11 @@
 		$('everyFace').onchange = e => { S.everyFace = e.target.checked; redo(false); };
 		$('nameOn').onchange = e => { S.nameOn = e.target.value; redo(false); };
 		$('sides').onchange = e => { S.sides = +e.target.value; picker(); redo(true); };
+		$('maxBricks').oninput = e => {
+			S.maxBricks = Math.max(0, num(e.target.value, 12));
+			$('maxBricksV').value = S.maxBricks ? S.maxBricks + ' bricks' : 'as many as it takes';
+			picker(); redo(true);
+		};
 		$('bedOn').onchange = e => { S.bedOn = e.target.value; redo(false); };
 		$('pallet').onchange = e => { S.pallet = e.target.checked; redo(true); };
 		$('fitPallet').onclick = () => {
@@ -344,15 +475,27 @@
 			toast(`${f.cols} across, gaps ${f.gapX} × ${f.gapZ} mm`);
 		};
 		$('order').onchange = e => { S.order = e.target.value; redo(true); };
-		$('titleSize').oninput = e => {
-			S.titleSize = num(e.target.value, 21);
-			$('titleSizeV').value = S.titleSize + ' mm';
-			redo(false);
+		// the bed and the ends are a fixed size whatever a brick carries, so
+		// everything printed on them is set in millimetres
+		for (const k of ['nameSize']) {
+			$(k).oninput = e => {
+				S[k] = num(e.target.value, S[k]);
+				$(k + 'V').value = S[k] + ' mm';
+				redo(false);
+			};
+		}
+		$('resetBed').onclick = () => {
+			S.bed = {}; panels(); redo(false);
+			toast('the top back to der Deckel’s setting');
 		};
-		$('nameSize').oninput = e => {
-			S.nameSize = num(e.target.value, 23);
-			$('nameSizeV').value = S.nameSize + ' mm';
-			redo(false);
+		$('resetPress').onclick = () => {
+			const on = S.press.on;
+			S.press = { on }; panels(); redo(false);
+			toast('the press back to its own setting');
+		};
+		$('resetFace').onclick = () => {
+			S.face = {}; panels(); redo(false);
+			toast('the faces back to what faces.js says');
 		};
 		$('clay').oninput = e => { S.clay = e.target.value; redo(false); };
 		$('inkCol').oninput = e => { S.ink = e.target.value; redo(false); };
@@ -376,12 +519,6 @@
 			toast(S.order === 'shuffle' ? 'dealt again — seed ' + S.layout.seed : 'seed ' + S.layout.seed);
 		};
 
-		for (const k of ['display', 'text']) {
-			const el = $(k);
-			el.innerHTML = Plate.FACES.map(f =>
-				`<option value="${f.id}"${f.id === S[k] ? ' selected' : ''}>${esc(f.label)}</option>`).join('');
-			el.onchange = e => { S[k] = e.target.value; redo(false); };
-		}
 
 		$('pressOn').onchange = e => { S.press.on = e.target.checked; redo(false); };
 		$('reseed').onclick = () => { S.press.seed = 1 + ((Math.random() * 99999) | 0); redo(false); };
@@ -390,6 +527,15 @@
 		$('vFront').onclick = () => { Scene.view(0, 0.12, false); Scene.frame(); };
 		$('vCorner').onclick = () => { Scene.view(-0.62, 0.30, false); Scene.frame(); };
 		$('vFrame').onclick = () => Scene.frame();
+		$('exScope').onchange = e => { S.exScope = e.target.value; exFoot(); save(); };
+		$('exGround').onchange = e => { S.exGround = e.target.value; save(); };
+		$('exPpmm').oninput = e => {
+			S.exPpmm = Math.max(4, num(e.target.value, 24));
+			$('exPpmmV').value = S.exPpmm + ' px/mm';
+			exFoot(); save();
+		};
+		$('exportFaces').onclick = exportFaces;
+
 		$('exportPng').onclick = () => {
 			const a = document.createElement('a');
 			a.href = Scene.snapshot();
@@ -414,16 +560,20 @@
 		$('everyFace').checked = S.everyFace;
 		$('nameOn').value = S.nameOn;
 		$('sides').value = S.sides;
+		$('maxBricks').value = S.maxBricks;
+		$('maxBricksV').value = S.maxBricks ? S.maxBricks + ' bricks' : 'as many as it takes';
 		$('bedOn').value = S.bedOn;
 		$('pallet').checked = S.pallet;
 		$('order').value = S.order;
 		$('minValue').max = FLOOR.length - 1;
 		$('minValue').value = Math.max(0, FLOOR.indexOf(S.minValue));
 		$('minValueV').value = S.minValue ? Model.figure(S.minValue) + " Ld'or" : 'no floor';
-		$('titleSize').value = S.titleSize; $('titleSizeV').value = S.titleSize + ' mm';
 		$('nameSize').value = S.nameSize; $('nameSizeV').value = S.nameSize + ' mm';
 		$('clay').value = S.clay;
 		$('inkCol').value = S.ink;
+		$('exScope').value = S.exScope;
+		$('exGround').value = S.exGround;
+		$('exPpmm').value = S.exPpmm; $('exPpmmV').value = S.exPpmm + ' px/mm';
 		$('rawUnits').checked = S.rawUnits;
 		$('pressOn').checked = S.press.on;
 		const L = S.layout;
@@ -446,9 +596,7 @@
 		try {
 			const jobs = [];
 			for (const f of Plate.FACES) {
-				jobs.push(document.fonts.load(`400 24px ${f.css}`).catch(() => { }));
-				jobs.push(document.fonts.load(`500 12px ${f.css}`).catch(() => { }));
-				jobs.push(document.fonts.load(`600 12px ${f.css}`).catch(() => { }));
+				for (const [w] of WEIGHTS) jobs.push(document.fonts.load(`${w} 24px ${f.css}`).catch(() => { }));
 				jobs.push(document.fonts.load(`italic 400 12px ${f.css}`).catch(() => { }));
 			}
 			await Promise.all(jobs);
@@ -460,7 +608,9 @@
 			if (kept) {
 				Object.assign(S, kept);
 				S.layout = Object.assign({ cols: 4, gapX: 120, gapZ: 120, stagger: 0, jitter: 0, turn: 0, seed: 7 }, kept.layout);
-				S.press = Object.assign({}, Ink.DEFAULTS, kept.press);
+				S.press = Object.assign({ on: false }, kept.press);
+				S.bed = kept.bed || {};
+				S.face = kept.face || {};
 						if (!Array.isArray(S.places)) S.places = [];
 				if (!Array.isArray(S.cats) || !S.cats.length) S.cats = Model.DEFAULT_CATS.slice();
 				if (!Array.isArray(S.exclude)) S.exclude = [];
@@ -473,7 +623,7 @@
 		if (!chosen().length) { document.body.innerHTML = '<p style="padding:40px">that volume has no places.</p>'; return; }
 
 		Scene.init($('stage'), $('canvasWrap'));
-		wire(); sync(); picker(); stand(true);
+		wire(); sync(); panels(); picker(); stand(true);
 	}
 
 	if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

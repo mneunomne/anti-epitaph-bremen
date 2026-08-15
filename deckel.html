@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>der Deckel — anti-epigraph</title>
+	<link rel="icon"
+		href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%231c1a18'/><rect x='2' y='4' width='12' height='8' fill='%23d98741'/><rect x='4' y='7' width='8' height='1.4' fill='%231c1a18'/></svg>">
+	<link rel="stylesheet" href="css/dashboard.css">
+	<link rel="stylesheet" href="css/tafeln.css">
+</head>
+
+<body>
+	<header class="bar">
+		<div class="brand">
+			<strong>der Deckel</strong>
+			<a href="stapel.html">der Stapel →</a>
+			<a href="feld.html">das Feld →</a>
+			<a href="tafeln.html">die Tafel →</a>
+			<a href="handel.html">bremens handel →</a>
+		</div>
+
+		<div class="proj">
+			<label class="check">Band <select id="yearSel" title="which volume"></select></label>
+		</div>
+
+		<div class="grow"></div>
+
+		<label class="check" title="print the measures as the scan gave them, ditto marks and all">
+			<input type="checkbox" id="rawUnits"> raw measures
+		</label>
+		<label class="check"><input type="checkbox" id="exWhite"> on white</label>
+		<select id="exPpmm" title="how fine the file comes off">
+			<option value="8">8 px/mm — screen</option>
+			<option value="16">16 px/mm</option>
+			<option value="24" selected>24 px/mm — print</option>
+			<option value="48">48 px/mm — plate</option>
+		</select>
+		<button id="exportPng" class="primary">export the top</button>
+	</header>
+
+	<main class="layout">
+		<!-- ---------------- the place ---------------- -->
+		<aside class="col controls">
+			<section>
+				<h2>the place</h2>
+				<div class="stepper">
+					<button id="prev" title="the one above">↑</button>
+					<button id="next" title="the one below">↓</button>
+					<span class="hint" id="rank">—</span>
+				</div>
+				<label>search <input type="search" id="placeSearch" placeholder="Cuba, Hannover, …"></label>
+				<div class="picker" id="picker"></div>
+				<p class="hint">↑ ↓ steps through the places, biggest Werth first. A place with a
+					<b>⚓</b> is one the harbour table counted ships for.
+				</p>
+			</section>
+
+			<section>
+				<h2>what the harbour table says</h2>
+				<div id="shipsPanel" class="hint">—</div>
+				<p class="hint">The arrivals from that place, printed in a different table from the goods
+					— ships, their Lasten, their crews, and the value the harbour master put on what they
+					carried. A place with no line here is not a place with no ships: it is a place the
+					table did not break out.</p>
+			</section>
+		</aside>
+
+		<!-- ---------------- the face ---------------- -->
+		<section class="col stage">
+			<div class="stage-tools">
+				<div class="zoomrow" style="min-width:250px">
+					<input type="range" id="zoom" min="10" max="900" step="1" value="400">
+					<output id="zoomV">400%</output>
+					<button id="zoomFit">fit</button>
+					<button id="zoom1">1:1</button>
+				</div>
+				<div class="grow"></div>
+				<div class="zoomrow">
+					<button id="vTop" class="on">the top alone</button>
+					<button id="vNet">the brick, laid flat</button>
+				</div>
+			</div>
+
+			<div class="canvas-wrap" id="canvasWrap">
+				<canvas id="stage"></canvas>
+			</div>
+
+			<div class="stage-foot" id="stageFoot">—</div>
+		</section>
+
+		<!-- ---------------- how it is set ---------------- -->
+		<aside class="col side">
+			<section>
+				<div class="panel-head">
+					<h2>the top — <span id="faceName">—</span></h2>
+					<button id="reset" title="back to the sketch's own setting">reset</button>
+				</div>
+				<p class="hint">The one face that is not a column of figures. The column heads were tried
+					here — its front edge is the top of the stretcher and its right edge the top of the
+					header — and they read as captions at a corner rather than as heads; they are a first
+					line on their own faces now. What is left is what belongs to the whole stack: whose
+					trade it is, off which printing, what it came to, and how many ships carried it.</p>
+			</section>
+
+			<section>
+				<h2>what stands on it</h2>
+				<div id="p_parts"></div>
+			</section>
+
+			<section>
+				<h2>the brick round it</h2>
+				<label>goods to a brick <input type="range" id="rows" min="1" max="8" step="1">
+					<output id="rowsV">3</output>
+				</label>
+				<label>which course <input type="range" id="course" min="0" step="1">
+					<output id="courseV">1</output>
+				</label>
+				<label class="ctl">the goods are printed<select id="sides">
+						<option value="1">on the front only</option>
+						<option value="2">on both sides</option>
+					</select></label>
+				<label class="ctl">the Werth<select id="figuresOn">
+						<option value="header">on the header, round the corner</option>
+						<option value="stretcher">beside its quantity, on the one face</option>
+					</select></label>
+				<label class="ctl">the money is<select id="currency">
+						<option value="none">not said</option>
+						<option value="first">said once, dittoed under it</option>
+						<option value="every">said on every line</option>
+					</select></label>
+				<label class="ctl">the place’s name also<select id="nameOn">
+						<option value="none">nowhere else</option>
+						<option value="end">on the far end</option>
+						<option value="back">on the back</option>
+						<option value="both">on both</option>
+					</select></label>
+				<label>the Waare names <input type="range" id="goodsSize" min="20" max="95" step="1">
+					<output id="goodsSizeV">50%</output>
+				</label>
+				<label>the Quantum and Werth figures <input type="range" id="figSize" min="20" max="95" step="1">
+					<output id="figSizeV">50%</output>
+				</label>
+				<label class="check"><input type="checkbox" id="heads"> a head line over the columns</label>
+				<p class="hint">a share of the row each good sits in, which is how faces.js sets them —
+					so they hold whatever number of goods a brick is asked to carry.</p>
+				<label class="check"><input type="checkbox" id="fold"> the folds, dashed</label>
+				<label class="check"><input type="checkbox" id="cut"> the line the knife takes</label>
+				<label class="check"><input type="checkbox" id="panelNames"> name the panels</label>
+				<p class="hint">The four sides are drawn by <i>faces.js</i>, off the same rules the yard
+					builds a course by — so the sheet is what der Stapel would print, not a second
+					opinion about it. The top is the sketch's own.</p>
+			</section>
+
+			<section>
+				<h2>the type</h2>
+				<div id="p_type"></div>
+			</section>
+
+			<section>
+				<h2>the spacing</h2>
+				<div id="p_space"></div>
+			</section>
+
+			<section>
+				<h2>the rules</h2>
+				<div id="p_rules"></div>
+			</section>
+
+			<section>
+				<div class="panel-head">
+					<h2>the press</h2>
+					<button id="resetInk">reset</button>
+				</div>
+				<label class="check"><input type="checkbox" id="inkOn"> run it through the press</label>
+				<div id="p_ink"></div>
+				<button id="reseed" class="wide">another sheet of paper</button>
+			</section>
+
+			<section>
+				<h2>the sketch</h2>
+				<p class="hint">This page is a workbench for one face. Nothing here is wired into the
+					yard yet — when the setting is right it goes into <i>faces.js</i> as the bed, and
+					every stack in der Stapel takes it.</p>
+				<button id="copySettings" class="wide">copy the settings as json</button>
+			</section>
+		</aside>
+	</main>
+
+	<div class="toast" id="toast"></div>
+
+	<script src="data/handel-all.js"></script>
+	<script src="js/tafeln/model.js"></script>
+	<script src="js/tafeln/plate.js"></script>
+	<script src="js/tafeln/ink.js"></script>
+	<script src="js/stapel/faces.js"></script>
+	<script src="js/deckel/bed.js"></script>
+	<script src="js/deckel/net.js"></script>
+	<script src="js/deckel/ui.js"></script>
+</body>
+
+</html>

@@ -78,9 +78,18 @@
 		leaderStep: 40,       // per cent of the size, between them
 		leaderSize: 4.5,     // per cent of the size
 
+		// The Quantum and the Werth are one thing on the page — a column of
+		// figures — and the volumes set them alike, so they are one face here
+		// too, the measure travelling with the quantity it belongs to. Empty
+		// means the text face, which is how the volumes have it.
+		figFace: '',
+		figSize: 11,
+		figWeight: 400,
+
 		totalRule: 1.6,
 		totalGap: 2.5,
 		totalLead: 15.4,
+		totalWeight: 600,
 		footSize: 8.6,
 		footLead: 11,
 	};
@@ -156,6 +165,7 @@
 		const m = metrics(o.m);
 		const DISPLAY = faceCss(m.display);
 		const TEXT = faceCss(m.text);
+		const FIG = m.figFace ? faceCss(m.figFace) : TEXT;
 		const ctx = measureCtx();
 		const w = o.width;
 
@@ -165,7 +175,7 @@
 		const cx = inset + m.padX;
 
 		// --- columns. The figures set the widths; the name takes the rest.
-		ctx.font = font(400, 'normal', m.rowSize, TEXT);
+		ctx.font = font(m.figWeight, 'normal', m.figSize, FIG);
 		let valW = ctx.measureText('000,000').width;
 		let qtyW = ctx.measureText('000,000').width;
 		let unitW = 0;
@@ -176,7 +186,7 @@
 		}
 		if (folded) valW = Math.max(valW, ctx.measureText(figure(folded.value)).width);
 		if (o.total) {
-			ctx.font = font(600, 'normal', m.rowSize, TEXT);
+			ctx.font = font(m.totalWeight, 'normal', m.figSize, FIG);
 			valW = Math.max(valW, ctx.measureText(figure(plate.total)).width);
 		}
 		ctx.font = font(400, 'normal', m.headSize, TEXT);
@@ -226,24 +236,28 @@
 		at.headRule = y;
 		y += m.headRule + 2.5;
 
+		// a line sits on one baseline whichever of the two faces is the taller,
+		// so raising the figures does not shave the tops off the names
+		const lineSize = Math.max(m.rowSize, m.figSize);
+
 		at.bodyTop = y;
 		const bodyLines = shown.length + (folded ? 1 : 0);
 		at.rows = [];
-		for (let i = 0; i < bodyLines; i++) at.rows.push(y + m.rowLead * i + m.rowSize);
+		for (let i = 0; i < bodyLines; i++) at.rows.push(y + m.rowLead * i + lineSize);
 		y += m.rowLead * bodyLines + 2;
 		at.bodyBottom = y;
 
 		if (o.total) {
 			at.totalRule = y;
 			y += m.totalRule + m.totalGap;
-			at.total = y + m.rowSize;
+			at.total = y + lineSize;
 			y += m.totalLead;
 		}
 		if (o.foot) { at.foot = y + m.footSize + 2; y += m.footLead + 2; }
 
 		y += m.padBottom + inset;
 
-		return { w, h: y, col, at, shown, folded, inset, cx, cw, o, m, title, DISPLAY, TEXT };
+		return { w, h: y, col, at, shown, folded, inset, cx, cw, o, m, title, DISPLAY, TEXT, FIG };
 	}
 
 	/* --------------------------------------------------------------- paint */
@@ -275,7 +289,7 @@
 	// computed at 1 and multiplied here, so nothing drifts between zooms.
 	function draw(ctx, plate, x, y, L, s, opts) {
 		const o = Object.assign({ ink: '#000', paper: '#fff' }, opts);
-		const m = L.m, DISPLAY = L.DISPLAY, TEXT = L.TEXT;
+		const m = L.m, DISPLAY = L.DISPLAY, TEXT = L.TEXT, FIG = L.FIG;
 		const P = v => v * s;
 
 		ctx.save();
@@ -355,7 +369,8 @@
 			const nameBox = L.col.name.w - m.colGap;
 			leaders(ctx, fit(ctx, r.article, P(nameBox) * 0.92), P(L.col.name.x + 2), by, P(nameBox), m.rowSize, m, P);
 
-			ctx.font = font(400, 'normal', P(m.rowSize), TEXT);
+			// the Quantum, its measure and the Werth are all one face
+			ctx.font = font(m.figWeight, 'normal', P(m.figSize), FIG);
 			ctx.textAlign = 'right';
 			ctx.fillText(figure(r.qty), P(L.col.qty.x + L.col.qty.w - m.colGap), by);
 			if (L.col.unit.w) {
@@ -373,6 +388,7 @@
 			const label = `Uebrige Waaren (${L.folded.count})`;
 			leaders(ctx, fit(ctx, label, P(L.col.name.w - m.colGap) * 0.92),
 				P(L.col.name.x + 2), by, P(L.col.name.w - m.colGap), m.rowSize, m, P);
+			ctx.font = font(m.figWeight, 'normal', P(m.figSize), FIG);
 			ctx.textAlign = 'right';
 			ctx.fillText(figure(L.folded.value), P(L.col.val.x + L.col.val.w - m.colGap), by);
 		}
@@ -384,7 +400,7 @@
 			ctx.font = font(400, 'italic', P(m.rowSize), TEXT);
 			ctx.textAlign = 'left';
 			ctx.fillText(T.Model.totalLabel(plate), P(L.col.name.x + 2), by);
-			ctx.font = font(600, 'normal', P(m.rowSize), TEXT);
+			ctx.font = font(m.totalWeight, 'normal', P(m.figSize), FIG);
 			ctx.textAlign = 'right';
 			ctx.fillText(figure(plate.total), P(L.col.val.x + L.col.val.w - m.colGap), by);
 		}

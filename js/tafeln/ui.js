@@ -43,6 +43,10 @@
 
 	/* ------------------------------------------------------- the controls */
 
+	// the faces on disk are variable over 400–700 and the fat faces have the
+	// one weight, so the list stops where the fonts do
+	const WEIGHTS = [[400, 'regular'], [500, 'medium'], [600, 'semibold'], [700, 'bold']];
+
 	// every metric, grouped the way it is thought about rather than the way
 	// it happens to sit in the layout pass
 	const PANEL = [
@@ -59,11 +63,12 @@
 				{ k: 'kickerSize', min: 5, max: 24, step: 0.5, label: '“Einfuhr von”' },
 				{ k: 'headSize', min: 5, max: 24, step: 0.5, label: 'column heads' },
 				{ k: 'headTrack', min: 0, max: 40, step: 1, label: 'head tracking', unit: '%' },
-				{ k: 'rowSize', min: 5, max: 28, step: 0.5, label: 'the goods' },
-				{
-					k: 'rowWeight', kind: 'select', label: 'the goods’ weight', opts: [
-						[400, 'regular'], [500, 'medium'], [600, 'semibold'], [700, 'bold']],
-				},
+				{ k: 'rowSize', min: 5, max: 28, step: 0.5, label: 'the goods’ names' },
+				{ k: 'rowWeight', kind: 'select', label: 'the goods’ weight', opts: WEIGHTS },
+				{ k: 'figFace', kind: 'face', same: 'the text face', label: 'the figures — Quantum and Werth' },
+				{ k: 'figSize', min: 5, max: 28, step: 0.5, label: 'the figures' },
+				{ k: 'figWeight', kind: 'select', label: 'the figures’ weight', opts: WEIGHTS },
+				{ k: 'totalWeight', kind: 'select', label: 'the sum’s weight', opts: WEIGHTS },
 				{ k: 'footSize', min: 5, max: 20, step: 0.5, label: 'the year and pages' },
 			],
 		},
@@ -112,7 +117,10 @@
 	function control(it, val, ns) {
 		const id = `${ns}_${it.k}`;
 		if (it.kind === 'face') {
-			return `<label class="ctl">${it.label}<select id="${id}" data-ns="${ns}" data-k="${it.k}">` +
+			// a face that may defer to another one carries the empty option first
+			const same = it.same
+				? `<option value=""${val ? '' : ' selected'}>${esc(it.same)}</option>` : '';
+			return `<label class="ctl">${it.label}<select id="${id}" data-ns="${ns}" data-k="${it.k}">` + same +
 				Plate.FACES.map(f => `<option value="${f.id}"${f.id === val ? ' selected' : ''}>${esc(f.label)}</option>`).join('') +
 				`</select></label>`;
 		}
@@ -275,6 +283,39 @@
 		if (on && !q) on.scrollIntoView({ block: 'nearest' });
 	}
 
+	// Every good the place sent, and what the block is doing with it: which of
+	// the six classes it was read into, what share of the sum it carries, and
+	// where the reading had to do something the page did not — a figure the
+	// volumes left as a dash, two lines added together across a column break,
+	// a measure restored to net pounds. A row greyed out is one folded into
+	// "Uebrige Waaren"; the bar is that good's share of the block's Werth.
+	const SHORT = new Map(Model.CATEGORIES.map(c => [c.key, c.short]));
+
+	function goodsList(fold) {
+		const shown = new Set(fold.shown.map(r => r.article + r.unit));
+		const total = plate.total || 0;
+		return plate.rows.map(r => {
+			const has = Number.isFinite(r.value);
+			const share = has && total > 0 ? (r.value / total) * 100 : null;
+			const note = [];
+			if (!has) note.push('<b class="g-flag">Werth ein Strich</b>');
+			if (!Number.isFinite(r.qty)) note.push('<b class="g-flag">kein Quantum</b>');
+			if (r.merged) note.push(`<b class="g-flag">${r.merged + 1} Zeilen addirt</b>`);
+			if (r.unit === Model.NETTO) note.push('<b class="g-flag net">Nto. ergänzt</b>');
+			return `<div class="good ${shown.has(r.article + r.unit) ? '' : 'out'}">` +
+				`<span class="g-n" title="${esc(r.article)}">${esc(r.article)}</span>` +
+				`<span class="g-q">${Model.figure(r.qty)} <i>${esc(r.unit)}</i></span>` +
+				`<span class="g-v">${Model.figure(r.value)}</span>` +
+				`<span class="g-meta">` +
+				`<span class="g-cat c-${r.cat}">${esc(SHORT.get(r.cat) || r.cat)}</span>` +
+				(share == null ? '' :
+					`<span class="g-bar"><i style="width:${Math.min(100, share).toFixed(1)}%"></i></span>` +
+					`<span class="g-pc">${share < 0.1 ? '<0.1' : share.toFixed(1)}%</span>`) +
+				note.join('') +
+				`</span></div>`;
+		}).join('');
+	}
+
 	function side() {
 		if (!plate) return;
 		cats();
@@ -308,13 +349,7 @@
 
 		const fold = Plate.bodyRows(plate, S.maxRows);
 		$('rowsV').value = `${fold.shown.length} / ${plate.rows.length}`;
-		const shown = new Set(fold.shown.map(r => r.article + r.unit));
-		$('goods').innerHTML = plate.rows.map(r =>
-			`<div class="good ${shown.has(r.article + r.unit) ? '' : 'out'}">` +
-			`<span class="g-n">${esc(r.article)}</span>` +
-			`<span class="g-q">${Model.figure(r.qty)} <i>${esc(r.unit)}</i></span>` +
-			`<span class="g-v">${Model.figure(r.value)}</span></div>`
-		).join('');
+		$('goods').innerHTML = goodsList(fold);
 	}
 
 	/* --------------------------------------------------------------- export */
@@ -457,8 +492,7 @@
 		try {
 			const jobs = [];
 			for (const f of Plate.FACES) {
-				jobs.push(document.fonts.load(`400 24px ${f.css}`).catch(() => { }));
-				jobs.push(document.fonts.load(`600 12px ${f.css}`).catch(() => { }));
+				for (const [w] of WEIGHTS) jobs.push(document.fonts.load(`${w} 24px ${f.css}`).catch(() => { }));
 				jobs.push(document.fonts.load(`italic 400 12px ${f.css}`).catch(() => { }));
 			}
 			await Promise.all(jobs);

@@ -222,7 +222,7 @@
 /* ---------------- the goods in the block ---------------- */
 
 .goods {
-	max-height: 220px;
+	max-height: 300px;
 	overflow-y: auto;
 	font-size: 11px;
 }
@@ -230,8 +230,8 @@
 .good {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) auto auto;
-	gap: 8px;
-	padding: 2px 0;
+	gap: 2px 8px;
+	padding: 3px 0;
 	border-bottom: 1px solid var(--line);
 	font-variant-numeric: tabular-nums;
 }
@@ -263,6 +263,106 @@
 .good .g-v {
 	min-width: 62px;
 	text-align: right;
+}
+
+/* the second line: what class the name was read into, what share of the
+   block's Werth the good carries, and anything the reading had to supply */
+.good .g-meta {
+	grid-column: 1 / -1;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 9.5px;
+	line-height: 1.4;
+	color: var(--faint);
+}
+
+.good.out .g-meta {
+	opacity: .55;
+}
+
+.good .g-cat {
+	flex: none;
+	letter-spacing: .04em;
+	text-transform: lowercase;
+	color: var(--dim);
+}
+
+.good .g-cat::before {
+	content: '';
+	display: inline-block;
+	width: 5px;
+	height: 5px;
+	margin-right: 4px;
+	border-radius: 50%;
+	background: currentColor;
+	vertical-align: 1px;
+}
+
+.good .c-consumables {
+	color: #c98a4b;
+}
+
+.good .c-raw_materials {
+	color: #7fa86a;
+}
+
+.good .c-semi_finished {
+	color: #6f9bb5;
+}
+
+.good .c-manufactured {
+	color: #b07ab8;
+}
+
+.good .c-industrial_art {
+	color: #d4a13c;
+}
+
+.good .c-specie_metals {
+	color: #cdc08a;
+}
+
+.good .c-unplaced {
+	color: var(--faint);
+}
+
+.good .g-bar {
+	flex: 1 1 auto;
+	min-width: 18px;
+	height: 3px;
+	background: var(--line);
+}
+
+.good .g-bar i {
+	display: block;
+	height: 100%;
+	background: var(--clay);
+}
+
+.good.out .g-bar i {
+	background: var(--faint);
+}
+
+.good .g-pc {
+	flex: none;
+	min-width: 30px;
+	text-align: right;
+	color: var(--dim);
+}
+
+/* where the block is not simply the page: a dash, two lines added
+   together, a measure carried down on ditto marks and restored here */
+.good .g-flag {
+	flex: none;
+	font-weight: 400;
+	padding: 0 4px;
+	border: 1px solid var(--line);
+	color: var(--dim);
+}
+
+.good .g-flag.net {
+	color: var(--faint);
 }
 
 /* ---------------- the block's own scale ---------------- */
