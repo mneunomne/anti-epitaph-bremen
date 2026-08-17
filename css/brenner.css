@@ -1,0 +1,88 @@
+/* der Brenner — the list of faces and the bed they are laid on. The rest of
+   the chrome is dashboard.css and tafeln.css, as everywhere else. */
+
+.faces {
+	max-height: 460px;
+	overflow-y: auto;
+	font-size: 11px;
+}
+
+.f-place {
+	display: flex;
+	justify-content: space-between;
+	margin: 8px 0 3px;
+	padding-bottom: 2px;
+	border-bottom: 1px solid var(--line);
+	color: var(--clay);
+	letter-spacing: .04em;
+}
+
+.f-place span {
+	color: var(--faint);
+}
+
+.f-row {
+	display: grid;
+	grid-template-columns: auto 52px 1fr auto 20px;
+	align-items: center;
+	gap: 5px;
+	padding: 2px 0;
+	cursor: pointer;
+	font-variant-numeric: tabular-nums;
+}
+
+.f-row:hover {
+	background: var(--panel);
+}
+
+.f-row.done .f-tag,
+.f-row.done .f-kind,
+.f-row.done .f-size {
+	color: var(--faint);
+	text-decoration: line-through;
+}
+
+.f-tag {
+	color: var(--ink);
+}
+
+.f-kind {
+	color: var(--dim);
+}
+
+.f-size {
+	color: var(--faint);
+	white-space: nowrap;
+	font-size: 10px;
+}
+
+.f-kind {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.f-done {
+	width: 20px;
+	padding: 0;
+	color: var(--faint);
+	background: none;
+	border: 1px solid var(--line);
+}
+
+.f-row.done .f-done {
+	color: var(--engraved);
+	border-color: var(--engraved);
+}
+
+/* the places are a list to pick from, not the whole column — the faces
+   under them are the point of the page */
+.controls .picker {
+	max-height: 34vh;
+}
+
+/* the bed sits on the dark, squared to its own proportions */
+.canvas-wrap canvas {
+	background: #141210;
+	box-shadow: 0 0 0 1px var(--line);
+}

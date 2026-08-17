@@ -181,11 +181,29 @@
 		// the header states what the head will touch, so you can frame it
 		// before you send it — which means the park move counts too, not
 		// just the ink
+		// Where the head goes when it is finished. It defaults to the tile's
+		// own corner, but a tile that is one small face on a large bed would
+		// then have the machine framing the whole way back to that corner —
+		// the framing box is the box of every move in the file, park included.
+		// So a caller may say where to park instead.
+		const parkX = o.parkX != null ? o.parkX : o.originX;
+		const parkY = o.parkY != null ? o.parkY : o.originY;
+
+		// A rectangle the head is asked to walk before anything is lit. It
+		// costs a few rapids and it is what the machine's "frame" traces, so
+		// the work can be squared up against the material before the beam is
+		// on — and it makes the framing box the work itself rather than
+		// whatever the ink happened to reach.
+		const fr = o.frame;
+
 		let b = r.bounds;
-		if (b && o.park) {
+		if (b) {
+			const xs = [b.minX, b.maxX], ys = [b.minY, b.maxY];
+			if (o.park) { xs.push(parkX); ys.push(parkY); }
+			if (fr) { xs.push(fr.minX, fr.maxX); ys.push(fr.minY, fr.maxY); }
 			b = {
-				minX: Math.min(b.minX, o.originX), minY: Math.min(b.minY, o.originY),
-				maxX: Math.max(b.maxX, o.originX), maxY: Math.max(b.maxY, o.originY)
+				minX: Math.min(...xs), minY: Math.min(...ys),
+				maxX: Math.max(...xs), maxY: Math.max(...ys)
 			};
 		}
 		const head = [
@@ -202,6 +220,16 @@
 			`; ${r.lines} lines, ${r.moves} moves, ~${clock(r.seconds)} at speed`,
 			'G00 G17 G40 G21 G54'
 		];
+		if (fr) {
+			const n = v => fmt(q(v, prec), prec);
+			head.push('; frame — the head walks the work before the beam is on');
+			head.push('G90');
+			head.push(`G0X${n(fr.minX)}Y${n(fr.minY)}`);
+			head.push(`G0X${n(fr.maxX)}Y${n(fr.minY)}`);
+			head.push(`G0X${n(fr.maxX)}Y${n(fr.maxY)}`);
+			head.push(`G0X${n(fr.minX)}Y${n(fr.maxY)}`);
+			head.push(`G0X${n(fr.minX)}Y${n(fr.minY)}`);
+		}
 		if (o.airAssist) head.push('M8');
 		head.push('; Layer C00');
 		head.push(o.laserMode === 'M4' ? 'M4' : 'M3');
@@ -210,7 +238,7 @@
 
 		const tail = ['G90', 'M5'];
 		if (o.airAssist) tail.push('M9');
-		if (o.park) tail.push('G0X' + fmt(q(o.originX, prec), prec) + 'Y' + fmt(q(o.originY, prec), prec));
+		if (o.park) tail.push('G0X' + fmt(q(parkX, prec), prec) + 'Y' + fmt(q(parkY, prec), prec));
 		tail.push('M2');
 
 		if (!r.ink) {

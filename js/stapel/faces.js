@@ -1,12 +1,12 @@
 /* faces.js — what is printed on a brick.
  *
- * A brick is 200 × 100 × 50. Laid as a stretcher it shows three faces to
+ * A brick is 196 × 95 × 45. Laid as a stretcher it shows three faces to
  * anyone standing in front of it, and this page uses two of them plus the
  * bed of the topmost course:
  *
- *   the stretcher, 200 × 50 — the goods, name run out to its quantity
- *   the header,    100 × 50 — the value of those same goods, flush right
- *   the bed,       200 × 100 — the place, where it was read, and the sum
+ *   the stretcher, 196 × 45 — the goods, name run out to its quantity
+ *   the header,    95 × 45 — the value of those same goods, flush right
+ *   the bed,       196 × 95 — the place, and where it was read
  *
  * Three goods to a brick, so the stack grows with what the place actually
  * sent: Brasilien 1851 at 25 goods stands nine courses high, Java at three
@@ -25,8 +25,8 @@
 	const S = (AE.Stapel = AE.Stapel || {});
 	const { figure } = T.Model;
 
-	// the brick, in millimetres
-	const BRICK = { l: 200, d: 100, h: 50 };
+	// the brick, in millimetres — the block as it is actually cut
+	const BRICK = { l: 196, d: 95, h: 45 };
 
 	const DEFAULTS = {
 		ppmm: 8,                 // texture resolution
@@ -109,15 +109,24 @@
 		colRule: 0,              // mm, between the Waare and the Quantum
 		valRule: 0.5,            // mm, before the Werth where it is on the stretcher
 
-		// The bed, all in millimetres — it is a fixed 200 × 100 whatever a brick
+		// The bed, all in millimetres — it is a fixed 196 × 95 whatever a brick
 		// is carrying, so here a size is a size. This is the setting worked out
 		// on der Deckel, which is a workbench for this one face; every figure
 		// below came off it.
 		//
 		// The bed is the only face that is not a column of figures, so it holds
 		// what belongs to the whole stack and to nothing narrower: whose trade
-		// it is, off which printing it was read, what it came to, and how many
-		// ships carried it. Each part can be taken off on its own.
+		// it is, off which printing it was read, and what it came to. Each part
+		// can be taken off on its own.
+		//
+		// Two things were tried on it and taken off again. The ships the
+		// harbour table counted, because that is a different table on a
+		// different footing and a count standing beside a Werth reads as part
+		// of the same reckoning when it is not one. And the sum itself, which
+		// belongs to the figures on the working faces and not over them: the
+		// top says whose trade it is and where it was read, and the Werth is
+		// where the Werth is. `shipsOf` is still here, because the page that
+		// shows them alongside is showing, not printing.
 		bedPadX: 12,
 		bedPadTop: 8,
 		bedPadBottom: 6,
@@ -135,25 +144,6 @@
 		source: true,
 		sourceSize: 5,           // which printing, which year, which pages
 		sourceGap: 4,
-
-		// The ships are the other half of what a place was: Brasilien 1851 is
-		// 1,800,508 Ld'or and it is also fifty ships, 6,016 Lasten and 483 men.
-		// The volumes print the two in different tables, and this is the one
-		// face with room to hold them together.
-		ships: true,
-		shipsSize: 5.5,
-		shipsWeight: 400,
-		shipsGap: 4,
-		shipsWhat: 'all',        // ships · all · full
-		shipsRule: 0.6,
-
-		sum: true,
-		sumRule: 0.8,
-		sumGap: 5,
-		sumLabelSize: 6,         // "Werth im Ganzen"
-		sumSize: 8.5,            // the figure itself
-		sumWeight: 600,
-		sumLeaders: true,
 
 		nameSize: 23,            // the place on the end and the back, in mm
 
@@ -177,18 +167,56 @@
 	// Charleston S/C. is cs — short enough to sit in a margin, and the same
 	// every time the yard is built.
 	const SKIP = /^(und|van|von|de|di|del|la|le|the|of|and)$/i;
+	const wordsOf = title => String(title || '')
+		.split(/[^A-Za-zÄÖÜäöüßÉéÈè]+/).filter(w => w && !SKIP.test(w));
+
 	function initials(title) {
-		const words = String(title || '').split(/[^A-Za-zÄÖÜäöüßÉéÈè]+/)
-			.filter(w => w && !SKIP.test(w));
+		const words = wordsOf(title);
 		if (!words.length) return 'xx';
 		const s = words.length > 1
-			? words.slice(0, 3).map(w => w[0]).join('')
+			? words.slice(0, 2).map(w => w[0]).join('')
 			: words[0].slice(0, 2);
 		return s.toLowerCase();
 	}
 
+	// Two letters will not always do: Hannover and Hamburg are both ha, and a
+	// mark that names two places names neither. So the whole volume is given
+	// its marks at once — a third letter where two collide, a fourth, a digit
+	// at the last — and because the list is the volume's own and not whatever
+	// is on screen, a filter cannot change what a brick is called.
+	function uniqueInitials(plates) {
+		const used = new Set(), map = {};
+		for (const p of plates) {
+			const w = wordsOf(p.title);
+			const tries = w.length > 1
+				? [w.slice(0, 2).map(x => x[0]).join(''), w.slice(0, 3).map(x => x[0]).join(''),
+				w[0].slice(0, 2) + w[1][0], w[0].slice(0, 3), w[0].slice(0, 4)]
+				: [w[0].slice(0, 2), w[0].slice(0, 3), w[0].slice(0, 4), w[0].slice(0, 5)];
+			let pick = tries.map(t => (t || '').toLowerCase()).find(t => t && !used.has(t));
+			if (!pick) {
+				const base = (tries[0] || 'xx').toLowerCase();
+				for (let i = 2; !pick; i++) if (!used.has(base + i)) pick = base + i;
+			}
+			used.add(pick);
+			map[p.id] = pick;
+		}
+		return map;
+	}
+
+	// worked out once a volume and kept, so every page marks the same brick
+	// the same way without having to be told to
+	const NAMED = {};
+	function namesFor(year) {
+		if (!NAMED[year]) {
+			try { NAMED[year] = uniqueInitials(T.Model.plates(year, {})); }
+			catch (e) { NAMED[year] = {}; }
+		}
+		return NAMED[year];
+	}
+
 	// br.1b — the place, the brick counting down from the top, the face
-	const tagFor = (plate, n, letter) => `${initials(plate.title)}.${n}${letter}`;
+	const tagFor = (plate, n, letter) =>
+		`${namesFor(plate.year)[plate.id] || initials(plate.title)}.${n}${letter}`;
 
 	// set in the margin over the head, where no face has anything else
 	function stamp(x, o, P, wmm) {
@@ -544,15 +572,13 @@
 
 	// Every baseline and rule on the bed, settled before anything is inked, so
 	// that the page can say what the setting has left of the face before it is
-	// drawn. `bedOn` at `sum` takes the place and its kicker off and lets the
-	// rest fall up the face — worth having, because in a yard seen from above
-	// the names are the loudest thing on the field and sometimes the figures
-	// are the point.
+	// drawn. `bedOn` at `source` takes the place and its kicker off and lets
+	// the rest fall up the face — worth having, because in a yard seen from
+	// above the names are the loudest thing on the field.
 	function bedLayout(plate, o) {
 		o = opt(o);
 		const at = {};
-		const full = o.bedOn !== 'sum';
-		at.shipsText = o.ships ? shipsLine(shipsOf(plate.year, plate.id), o.shipsWhat) : null;
+		const full = o.bedOn !== 'sum' && o.bedOn !== 'source';
 		let y = o.bedPadTop;
 
 		if (o.kicker && full) { at.kicker = y + o.kickerSize * 0.80; y += o.kickerSize + o.kickerGap; }
@@ -564,18 +590,6 @@
 		}
 
 		if (o.source) { at.source = y + o.sourceSize * 0.80; y += o.sourceSize + o.sourceGap; }
-
-		if (at.shipsText) {
-			if (o.shipsRule > 0) at.shipsRule = y - o.shipsGap * 0.45;
-			at.ships = y + o.shipsSize * 0.80;
-			y += o.shipsSize + o.shipsGap;
-		}
-
-		if (o.sum) {
-			if (o.sumRule > 0) { at.sumRule = y; y += o.sumRule + o.sumGap; }
-			at.sum = y + o.sumSize * 0.78;
-			y += o.sumSize;
-		}
 
 		at.flowBottom = y;
 		// what the flow has left of the face, or how far it has run off it
@@ -622,50 +636,6 @@
 		if (at.source != null) {
 			x.font = `400 italic ${P(o.sourceSize)}px ${TEXT}`;
 			x.fillText(sourceLine(plate), P(W / 2), P(at.source));
-		}
-
-		if (at.ships != null) {
-			if (at.shipsRule != null) {
-				const si = W * 0.34;
-				x.fillRect(P(si), P(at.shipsRule), P(W - si * 2), P(o.shipsRule));
-			}
-			x.font = `${o.shipsWeight} ${P(o.shipsSize)}px ${TEXT}`;
-			x.fillText(at.shipsText, P(W / 2), P(at.ships));
-		}
-
-		if (at.sum != null) {
-			if (at.sumRule != null)
-				x.fillRect(P(o.bedPadX), P(at.sumRule), P(W - o.bedPadX * 2), P(o.sumRule));
-
-			const y = P(at.sum);
-			const label = T.Model.totalLabel(plate);
-			x.textAlign = 'left';
-			x.font = `400 italic ${P(o.sumLabelSize)}px ${TEXT}`;
-			x.fillText(label, P(o.bedPadX), y);
-			const lw = x.measureText(label).width;
-
-			// the figure, and the money it is counted in after it — smaller, so
-			// that the sum is still the thing the eye lands on
-			const mark = o.mark || '';
-			const markSize = o.sumSize * o.markSize / 100;
-			x.font = `400 ${P(markSize)}px ${TEXT}`;
-			const mw = mark ? x.measureText(mark).width + P(o.markGap) : 0;
-			x.font = `${o.sumWeight} ${P(o.sumSize)}px ${FIG}`;
-			const fg = figure(plate.total);
-			const fw = x.measureText(fg).width;
-			x.textAlign = 'right';
-			x.fillText(fg, P(W - o.bedPadX) - mw, y);
-			if (mark) {
-				x.textAlign = 'left';
-				x.font = `400 ${P(markSize)}px ${TEXT}`;
-				x.fillText(mark, P(W - o.bedPadX) - mw + P(o.markGap), y);
-			}
-
-			if (o.sumLeaders) {
-				x.textAlign = 'left';
-				leaders(x, P(o.bedPadX) + lw + P(2.5), P(W - o.bedPadX) - mw - fw - P(2.5),
-					y - P(o.sumLabelSize * 0.28), P(o.sumLabelSize));
-			}
 		}
 
 		return pressed(c, o);
@@ -770,8 +740,65 @@
 		return out;
 	}
 
+	/* ------------------------------------------------------- the whole stack */
+
+	// Every printed side of a stack, in the order it stands: course by course
+	// from the top down, the bed with the course that carries it, and the two
+	// name faces last, since they belong to no one course. Each carries its
+	// size, the mark it will be engraved with, and a way to draw it.
+	//
+	// The lettering lives here and nowhere else. The yard, the exporter and
+	// the engraver all read this list, so what a brick has on it cannot be one
+	// thing on screen and another on the bed of a laser.
+	function faceList(plate, o) {
+		o = opt(o);
+		const cs = courses(plate, o.rows, o.sides, o.maxBricks, o.heads);
+		const two = o.sides === 2;
+		const oneFace = merged(o);
+		const nameOn = (two && !oneFace) ? 'none' : (o.nameOn || 'none');
+		const out = [];
+
+		const put = (id, tag, kind, w, h, course, letter, make) =>
+			out.push({ id, tag, kind, w, h, course, letter, make });
+
+		cs.forEach((load, i) => {
+			const n = i + 1;
+			const top = load.head ? {} : { top: false };
+			const opts = (l, ov) => Object.assign({}, o, top, ov, { tag: tagFor(plate, n, l) });
+
+			put(`c${n}b`, tagFor(plate, n, 'b'), 'stretcher', BRICK.l, BRICK.h, n, 'b',
+				ov => stretcher(load.front, opts('b', ov)));
+			if (!oneFace)
+				put(`c${n}c`, tagFor(plate, n, 'c'), 'header', BRICK.d, BRICK.h, n, 'c',
+					ov => header(load.front, opts('c', ov)));
+			if (two && load.back.length) {
+				put(`c${n}d`, tagFor(plate, n, 'd'), 'stretcher', BRICK.l, BRICK.h, n, 'd',
+					ov => stretcher(load.back, opts('d', ov)));
+				if (!oneFace)
+					put(`c${n}e`, tagFor(plate, n, 'e'), 'header', BRICK.d, BRICK.h, n, 'e',
+						ov => header(load.back, opts('e', ov)));
+			}
+			// the bed comes off the course that carries it, and only that one
+			if (i === 0 && o.bedOn !== 'none')
+				put(`c${n}a`, tagFor(plate, n, 'a'), 'bed', BRICK.l, BRICK.d, n, 'a',
+					ov => bed(plate, Object.assign({}, o, ov)));
+		});
+
+		// the name is one drawing for every course, so it is marked by face
+		// alone and comes off once however tall the stack is
+		const nameOpts = (l, ov) => Object.assign({}, o, ov, { tag: tagFor(plate, '', l) });
+		if (nameOn === 'end' || nameOn === 'both')
+			put('name-e', tagFor(plate, '', 'e'), 'name', BRICK.d, BRICK.h, 0, 'e',
+				ov => nameplate(plate, BRICK.d, BRICK.h, nameOpts('e', ov)));
+		if (nameOn === 'back' || nameOn === 'both')
+			put('name-d', tagFor(plate, '', 'd'), 'name', BRICK.l, BRICK.h, 0, 'd',
+				ov => nameplate(plate, BRICK.l, BRICK.h, nameOpts('d', ov)));
+
+		return out;
+	}
+
 	S.Faces = {
 		BRICK, DEFAULTS, stretcher, header, bed, bedLayout, nameplate, blank, courses,
-		sourceLine, shipsOf, shipsLine, tagFor, initials,
+		sourceLine, shipsOf, shipsLine, tagFor, initials, namesFor, faceList,
 	};
 })(window);

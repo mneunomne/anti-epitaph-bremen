@@ -255,52 +255,12 @@
 
 	/* --------------------------------------------------------- as files */
 
-	// Every printed side of a stack, in the order it would be laid out to
-	// print: course by course from the top down, the bed with the course that
-	// carries it, and the name last because it is one drawing hung on all of
-	// them rather than one a course. A face with nothing on it is not a file —
-	// the yard shares a single blank across every brick in it, and a folder of
-	// identical empty pngs would say nothing.
+	// what the export writes, off the one list in faces.js — the same faces in
+	// the same order with the same marks the yard prints and the engraver burns
 	function facesOf(plate, o) {
-		const B = Faces.BRICK;
-		const cs = Faces.courses(plate, Math.max(1, o.rows | 0), o.sides, o.maxBricks, o.heads);
-		const two = o.sides === 2;
-		const oneFace = o.figuresOn === 'stretcher';
-		const nameOn = (two && !oneFace) ? 'none' : (o.nameOn || 'none');
-		const out = [];
-
-		cs.forEach((load, i) => {
-			const c = 'c' + (i + 1);
-			// the same options and the same marks the yard would give this
-			// course, so a file and a brick cannot disagree
-			const base = load.head ? o : Object.assign({}, o, { top: false });
-			const fo = l => Object.assign({}, base, { tag: Faces.tagFor(plate, i + 1, l) });
-
-			out.push([`${c}-stretcher`, () => Faces.stretcher(load.front, fo('b'))]);
-			if (!oneFace) out.push([`${c}-header`, () => Faces.header(load.front, fo('c'))]);
-			if (two && load.back.length) {
-				out.push([`${c}-stretcher-back`, () => Faces.stretcher(load.back, fo('d'))]);
-				if (!oneFace) out.push([`${c}-header-back`, () => Faces.header(load.back, fo('e'))]);
-			}
-			// the top. Only the topmost course shows one in a yard — the rest are
-			// under a brick — so it comes off once. A stack standing without a bed
-			// still has a top to print, so the export sets it as it would be set
-			// rather than writing a bare face.
-			if (i === 0) {
-				const bed = o.bedOn === 'none' ? Object.assign({}, o, { bedOn: 'full' }) : o;
-				out.push([`${c}-bed`, () => Faces.bed(plate, bed)]);
-			}
-		});
-
-		// the name is one drawing hung on every course, and those courses are
-		// interchangeable, so its mark names the face and not a brick
-		if (nameOn === 'end' || nameOn === 'both')
-			out.push(['name-end', () => Faces.nameplate(plate, B.d, B.h,
-				Object.assign({}, o, { tag: Faces.tagFor(plate, '', 'e') }))]);
-		if (nameOn === 'back' || nameOn === 'both')
-			out.push(['name-back', () => Faces.nameplate(plate, B.l, B.h,
-				Object.assign({}, o, { tag: Faces.tagFor(plate, '', 'd') }))]);
-		return out;
+		// a file is named for the mark that is on the face — br.3b and no more,
+		// so a folder of them sorts into stacks and reads like the bricks do
+		return Faces.faceList(plate, o).map(f => [f.tag, () => f.make()]);
 	}
 
 	// what the export is about to write, so the button can say so before it is
@@ -330,7 +290,7 @@
 				const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
 				const a = document.createElement('a');
 				a.href = URL.createObjectURL(blob);
-				a.download = `bremen-${S.year}-${plate.id}-${name}-${canvas.width}x${canvas.height}.png`;
+				a.download = `${S.year}-${name}.png`;
 				a.click();
 				setTimeout(() => URL.revokeObjectURL(a.href), 8000);
 				// the canvas is a few million pixels and there may be a hundred of
@@ -539,7 +499,7 @@
 		$('exportPng').onclick = () => {
 			const a = document.createElement('a');
 			a.href = Scene.snapshot();
-			a.download = `bremen-${S.year}-${S.many ? S.places.length + 'stapel' : S.places[0]}.png`;
+			a.download = `${S.year}-${S.many ? S.places.length + 'stapel' : Faces.namesFor(S.year)[S.places[0]] || S.places[0]}.png`;
 			a.click();
 			toast('view saved');
 		};

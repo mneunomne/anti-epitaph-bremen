@@ -369,7 +369,7 @@
 		const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
 		const a = document.createElement('a');
 		a.href = URL.createObjectURL(blob);
-		a.download = `bremen-${S.year}-${S.place}-${cv.width}x${cv.height}.png`;
+		a.download = `${S.year}-${S.place}.png`;
 		a.click();
 		setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 		toast(`${cv.width} × ${cv.height} png`);
@@ -382,7 +382,7 @@
 		lines.push([q('Werth im Ganzen'), '', '', plate.total ?? ''].join(','));
 		const a = document.createElement('a');
 		a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' }));
-		a.download = `bremen-${S.year}-${S.place}.csv`;
+		a.download = `${S.year}-${S.place}.csv`;
 		a.click();
 		setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 	}

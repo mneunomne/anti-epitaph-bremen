@@ -52,16 +52,6 @@
 			id: 'parts', items: [
 				{ k: 'kicker', kind: 'check', label: '“Einfuhr von” over the name' },
 				{ k: 'source', kind: 'check', label: 'the printing, the year, the pages' },
-				{ k: 'ships', kind: 'check', label: 'the ships that carried it' },
-				{
-					k: 'shipsWhat', kind: 'select', label: 'and of the ships', opts: [
-						['ships', 'the count alone'],
-						['all', 'ships · Lasten · Mann'],
-						['full', 'laden and empty as well']],
-				},
-				{ k: 'sum', kind: 'check', label: 'the sum' },
-				{ k: 'sumLeaders', kind: 'check', label: 'leader dots to the sum' },
-				{ k: 'mark', kind: 'text', label: 'the money is called' },
 			],
 		},
 		{
@@ -72,12 +62,6 @@
 				{ k: 'titleSize', min: 6, max: 46, step: 0.5, label: 'the place', unit: ' mm' },
 				{ k: 'kickerSize', min: 2, max: 18, step: 0.5, label: '“Einfuhr von”', unit: ' mm' },
 				{ k: 'sourceSize', min: 2, max: 16, step: 0.5, label: 'the printing and pages', unit: ' mm' },
-				{ k: 'shipsSize', min: 2, max: 18, step: 0.5, label: 'the ships', unit: ' mm' },
-				{ k: 'shipsWeight', kind: 'select', label: 'the ships’ weight', opts: WEIGHTS },
-				{ k: 'sumLabelSize', min: 2, max: 18, step: 0.5, label: '“Werth im Ganzen”', unit: ' mm' },
-				{ k: 'sumSize', min: 3, max: 30, step: 0.5, label: 'the sum', unit: ' mm' },
-				{ k: 'sumWeight', kind: 'select', label: 'the sum’s weight', opts: WEIGHTS },
-				{ k: 'markSize', min: 20, max: 120, step: 1, label: 'the money, of the sum', unit: '%' },
 			],
 		},
 		{
@@ -89,17 +73,12 @@
 				{ k: 'titleGap', min: 0, max: 20, step: 0.5, label: 'under the name', unit: ' mm' },
 				{ k: 'underGap', min: 0, max: 20, step: 0.5, label: 'under the heavy rule', unit: ' mm' },
 				{ k: 'sourceGap', min: 0, max: 20, step: 0.5, label: 'under the printing', unit: ' mm' },
-				{ k: 'shipsGap', min: 0, max: 20, step: 0.5, label: 'under the ships', unit: ' mm' },
-				{ k: 'sumGap', min: 0, max: 20, step: 0.5, label: 'over the sum', unit: ' mm' },
-				{ k: 'markGap', min: 0, max: 10, step: 0.2, label: 'before the money', unit: ' mm' },
 			],
 		},
 		{
 			id: 'rules', items: [
 				{ k: 'underRule', min: 0, max: 8, step: 0.1, label: 'under the name', unit: ' mm' },
 				{ k: 'underInset', min: 0, max: 45, step: 0.5, label: 'held clear each side', unit: '%' },
-				{ k: 'shipsRule', min: 0, max: 5, step: 0.1, label: 'over the ships', unit: ' mm' },
-				{ k: 'sumRule', min: 0, max: 5, step: 0.1, label: 'over the sum', unit: ' mm' },
 			],
 		},
 	];
@@ -271,7 +250,12 @@
 			`<span class="${over ? 'bad' : ''}">${over
 				? `<b>${Math.abs(at.slack).toFixed(1)} mm</b> off the face`
 				: `<b>${at.slack.toFixed(1)} mm</b> of white left on the face`}</span>` +
-			(at.shipsText ? `<span>${esc(at.shipsText)}</span>` : `<span class="warn">no ships counted</span>`) +
+			(() => {
+				// shown beside the face, never on it
+				const line = Bed.shipsLine(Bed.shipsOf(S.year, plate.id), 'all');
+				return line ? `<span class="hint">the harbour table: ${esc(line)}</span>`
+					: `<span class="warn">the harbour table does not break this place out</span>`;
+			})() +
 			`<span>Werth <b>${Model.figure(plate.total)}</b> ${esc(m.mark)}</span>`;
 	}
 
@@ -330,8 +314,8 @@
 		const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
 		const a = document.createElement('a');
 		a.href = URL.createObjectURL(blob);
-		const what = S.view === 'net' ? `netz-c${S.course + 1}` : 'deckel';
-		a.download = `bremen-${S.year}-${S.place}-${what}-${canvas.width}x${canvas.height}.png`;
+		const what = S.view === 'net' ? `netz${S.course + 1}` : 'deckel';
+		a.download = `${S.year}-${AE.Stapel.Faces.namesFor(S.year)[S.place] || S.place}-${what}.png`;
 		a.click();
 		setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 		toast(`${canvas.width} × ${canvas.height} png`);

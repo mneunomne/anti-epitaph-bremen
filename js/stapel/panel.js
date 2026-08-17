@@ -84,25 +84,11 @@
 	const BED = [
 		{ k: 'kicker', kind: 'check', label: '“Einfuhr von” over the name' },
 		{ k: 'source', kind: 'check', label: 'the printing, the year, the pages' },
-		{ k: 'ships', kind: 'check', label: 'the ships that carried it' },
-		{
-			k: 'shipsWhat', kind: 'select', label: 'and of the ships', opts: [
-				['ships', 'the count alone'],
-				['all', 'ships · Lasten · Mann'],
-				['full', 'laden and empty as well']],
-		},
-		{ k: 'sum', kind: 'check', label: 'the sum' },
-		{ k: 'sumLeaders', kind: 'check', label: 'leader dots to the sum' },
 
-		{ note: 'the bed is a fixed 200 × 100, so here a size is a size' },
+		{ note: 'the bed is a fixed 196 × 95, so here a size is a size' },
 		{ k: 'titleSize', min: 6, max: 46, step: 0.5, unit: ' mm', label: 'the place' },
 		{ k: 'kickerSize', min: 2, max: 18, step: 0.5, unit: ' mm', label: '“Einfuhr von”' },
 		{ k: 'sourceSize', min: 2, max: 16, step: 0.5, unit: ' mm', label: 'the printing and pages' },
-		{ k: 'shipsSize', min: 2, max: 18, step: 0.5, unit: ' mm', label: 'the ships' },
-		{ k: 'shipsWeight', kind: 'select', opts: WEIGHTS, label: 'the ships’ weight' },
-		{ k: 'sumLabelSize', min: 2, max: 18, step: 0.5, unit: ' mm', label: '“Werth im Ganzen”' },
-		{ k: 'sumSize', min: 3, max: 30, step: 0.5, unit: ' mm', label: 'the sum' },
-		{ k: 'sumWeight', kind: 'select', opts: WEIGHTS, label: 'the sum’s weight' },
 
 		{ note: 'the spacing down the face' },
 		{ k: 'bedPadX', min: 0, max: 40, step: 0.5, unit: ' mm', label: 'in from the sides' },
@@ -112,14 +98,10 @@
 		{ k: 'titleGap', min: 0, max: 20, step: 0.5, unit: ' mm', label: 'under the name' },
 		{ k: 'underGap', min: 0, max: 20, step: 0.5, unit: ' mm', label: 'under the heavy rule' },
 		{ k: 'sourceGap', min: 0, max: 20, step: 0.5, unit: ' mm', label: 'under the printing' },
-		{ k: 'shipsGap', min: 0, max: 20, step: 0.5, unit: ' mm', label: 'under the ships' },
-		{ k: 'sumGap', min: 0, max: 20, step: 0.5, unit: ' mm', label: 'over the sum' },
 
 		{ note: 'the rules' },
 		{ k: 'underRule', min: 0, max: 8, step: 0.1, unit: ' mm', label: 'under the name' },
 		{ k: 'underInset', min: 0, max: 45, step: 0.5, unit: '%', label: 'held clear each side' },
-		{ k: 'shipsRule', min: 0, max: 5, step: 0.1, unit: ' mm', label: 'over the ships' },
-		{ k: 'sumRule', min: 0, max: 5, step: 0.1, unit: ' mm', label: 'over the sum' },
 	];
 
 	/* ------------------------------------------------------------ the press */

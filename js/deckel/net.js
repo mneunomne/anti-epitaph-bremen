@@ -8,11 +8,11 @@
  * sides hinged off it, everything the brick knows on one sheet.
  *
  *              ┌──────────────┐
- *              │  the back    │   200 × 50, set upside down: it folds up
+ *              │  the back    │   196 × 45, set upside down: it folds up
  *   ┌────┬─────┴──────────────┴─────┬────┐
- *   │ -X │        the bed           │ +X │   100 × 50 each, on their sides
+ *   │ -X │        the bed           │ +X │   95 × 45 each, on their sides
  *   └────┴─────┬──────────────┬─────┴────┘
- *              │  the front   │   200 × 50 — the goods
+ *              │  the front   │   196 × 45 — the goods
  *              └──────────────┘
  *
  * Which face carries what is not decided here: it is read off the same rules
@@ -27,7 +27,7 @@
 	const D = (AE.Deckel = AE.Deckel || {});
 	const F = () => AE.Stapel.Faces;
 
-	const B = { l: 200, d: 100, h: 50 };
+	const B = { l: 196, d: 95, h: 45 };
 	const SHEET = { w: B.h + B.l + B.h, h: B.h + B.d + B.h };   // 300 × 200
 
 	// where each panel lands on the sheet, and how far round it has been

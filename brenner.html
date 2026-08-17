@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>der Brenner — anti-epigraph</title>
+	<link rel="icon"
+		href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%231c1a18'/><rect x='2' y='2' width='12' height='12' fill='none' stroke='%23d98741' stroke-width='1.4'/><rect x='5' y='5' width='6' height='2' fill='%23d98741'/></svg>">
+	<link rel="stylesheet" href="css/dashboard.css">
+	<link rel="stylesheet" href="css/tafeln.css">
+	<link rel="stylesheet" href="css/brenner.css">
+</head>
+
+<body>
+	<header class="bar">
+		<div class="brand">
+			<strong>der Brenner</strong>
+			<a href="stapel.html">der Stapel →</a>
+			<a href="deckel.html">der Deckel →</a>
+			<a href="feld.html">das Feld →</a>
+			<a href="tafeln.html">die Tafel →</a>
+		</div>
+
+		<div class="proj">
+			<label class="check">Band <select id="yearSel" title="which volume"></select></label>
+		</div>
+
+		<div class="grow"></div>
+
+		<span class="hint" id="jobLine">—</span>
+		<button id="exportSheet">this sheet</button>
+		<button id="exportAll" class="primary">every sheet — .gc</button>
+	</header>
+
+	<main class="layout">
+		<!-- ---------------- what is to be burnt ---------------- -->
+		<aside class="col controls">
+			<section>
+				<h2>the places</h2>
+				<label>search <input type="search" id="placeSearch" placeholder="Brasilien, Cuba, …"></label>
+				<div class="picker" id="picker"></div>
+				<p class="hint">Pick the places whose bricks are to be cut. The faces are the ones der
+					Stapel would print, off the same list and with the same marks — <b>br.1b</b> is
+					Brasilien, first brick down, the stretcher.</p>
+			</section>
+
+			<section>
+				<div class="panel-head">
+					<h2>the faces</h2>
+					<button id="allFaces">all</button>
+					<button id="freshFaces">un-burnt</button>
+					<button id="noFaces">none</button>
+				</div>
+				<label class="check"><input type="checkbox" id="hideDone"> hide what is done</label>
+				<div class="faces" id="faceList"></div>
+			</section>
+		</aside>
+
+		<!-- ---------------- the bed ---------------- -->
+		<section class="col stage">
+			<div class="stage-tools">
+				<div class="views">
+					<button id="prevSheet">←</button>
+					<span class="hint" id="sheetNo">—</span>
+					<button id="nextSheet">→</button>
+				</div>
+				<div class="grow"></div>
+				<button id="resetArrange">the frame in order</button>
+				<button id="markSheet">mark this sheet burnt</button>
+				<button id="unmarkSheet">un-mark it</button>
+			</div>
+
+			<div class="canvas-wrap" id="canvasWrap">
+				<canvas id="stage"></canvas>
+			</div>
+
+			<div class="stage-foot" id="foot">—</div>
+		</section>
+
+		<!-- ---------------- how it is burnt ---------------- -->
+		<aside class="col side">
+			<section>
+				<h2>the bed</h2>
+				<div class="grid2">
+					<label>across <input type="number" id="bedW" min="50" max="2000" step="1"><i>mm</i></label>
+					<label>back <input type="number" id="bedH" min="50" max="2000" step="1"><i>mm</i></label>
+				</div>
+				<p class="hint">What the head can actually reach, not what the machine is sold as — a
+					bed figure is always a little optimistic. The frame is built inside it and stands in
+					the machine's own corner, so a job never asks for travel that is not there. The foot
+					says the rectangle the head will keep to.</p>
+				<label>a margin all round <input type="range" id="margin" min="0" max="40" step="0.5">
+					<output id="marginV">5 mm</output>
+				</label>
+				<label>between the faces <input type="range" id="gap" min="0" max="40" step="0.5">
+					<output id="gapV">4 mm</output>
+				</label>
+				<label class="check"><input type="checkbox" id="turn"> turn a face flat on the bed where
+					it is the only way it fits</label>
+				<label class="check"><input type="checkbox" id="oneSideAtATime"> one side of the brick to
+					a sheet — the focus is set once</label>
+				<label class="check"><input type="checkbox" id="frameFirst"> walk the work first, beam
+					off — and keep the machine's framing to it</label>
+				<p class="hint" id="frameLine">—</p>
+				<p class="hint">Bricks go into the frame in order — up the first column from the corner
+					the head starts in, then up the next — and a cell holds a <i>brick</i>, not a face.
+					It reads the wrong way round against a sketch on paper, and it is right for the
+					machine: one brick on a sheet is one brick's worth of travel, not the length of the
+					bed and back. So side B is burnt, every brick
+					is turned over where it lies, and side D is the sheet after it, in the very same
+					cells. Click a brick on the bed and then another to swap the two; <i>the frame in
+						order</i> puts them back.</p>
+				<p class="hint">A brick shows one face at a time, and a face is only in focus at its own
+					height: lying on its underside a brick's top stands 45 mm off the bed, stood on a long
+					side 95, on an end 196. So a sheet is all tops, or all long sides, or all ends, and no
+					two faces of one brick are on it. 410 will not take two 196s and a gap without either
+					the margin coming off or a face going round, so the frame says which it did. The
+					cells never move: every sheet of a side is the same grid, the last one only with
+					its end empty, so a frame squared up once does for the whole run.</p>
+			</section>
+
+			<section>
+				<h2>the burn</h2>
+				<label>scan lines <input type="range" id="lines" min="2" max="20" step="1">
+					<output id="linesV">10 /mm</output>
+				</label>
+				<label>the feed along a line <input type="range" id="feed" min="200" max="12000" step="100">
+					<output id="feedV">6000 mm/min</output>
+				</label>
+				<label>power <input type="range" id="power" min="1" max="100" step="1">
+					<output id="powerV">100%</output>
+				</label>
+				<div class="grid2">
+					<label>S at full <input type="number" id="sMax" min="1" max="10000" step="10"></label>
+					<label>passes <input type="number" id="passes" min="1" max="10" step="1"></label>
+				</div>
+				<label class="ctl">the beam<select id="laserMode">
+						<option value="M3">M3 — constant power</option>
+						<option value="M4">M4 — dynamic, power follows the speed</option>
+					</select></label>
+				<label>run-up outside the ink <input type="range" id="overscan" min="0" max="5" step="0.1">
+					<output id="overscanV">0 mm</output>
+				</label>
+				<label>the rapid, for the estimate <input type="range" id="rapid" min="500" max="20000" step="100">
+					<output id="rapidV">6000 mm/min</output>
+				</label>
+				<label class="check"><input type="checkbox" id="bidirectional"> burn both ways along the line</label>
+				<label class="check"><input type="checkbox" id="airAssist"> air assist — M8 / M9</label>
+				<label class="check"><input type="checkbox" id="park"> park at the origin when it is done</label>
+				<p class="hint">The file is written by the same emitter as the engraving desk — the
+					dialect that has already run on the machine: G90 to the start of a line, G91 along it
+					with S on every move, the whole sheet one raster so the head never stops mid-line.
+					The rapid figure only changes the estimate: how fast G0 actually moves is the
+					machine's own business.</p>
+			</section>
+
+			<section>
+				<div class="panel-head">
+					<h2>the press</h2>
+					<button id="resetPress">reset</button>
+				</div>
+				<label class="check"><input type="checkbox" id="pressOn"> burn the faces as they come off
+					the press</label>
+				<div id="p_press"></div>
+				<button id="reseed" class="wide">another sheet of paper</button>
+				<p class="hint">The same press der Stapel sets, and it comes over with the yard's own
+					setting — the wandering edge and the ink gaining, which are the type itself. The
+					mottling and the specks in the white are left behind: they are paper, and burnt they
+					are a few hundred extra scan lines for a few hundred specks of char.</p>
+			</section>
+
+			<section>
+				<div class="panel-head">
+					<h2>what is done</h2>
+					<button id="clearDone">forget it all</button>
+				</div>
+				<p class="hint" id="doneLine">—</p>
+				<p class="hint">A face is registered as burnt when you mark it — by the sheet, or one at
+					a time in the list. It is kept per volume and per place, so a stack half cut today
+					is the other half tomorrow.</p>
+			</section>
+		</aside>
+	</main>
+
+	<div class="toast" id="toast"></div>
+
+	<script src="data/handel-all.js"></script>
+	<script src="js/tafeln/model.js"></script>
+	<script src="js/tafeln/plate.js"></script>
+	<script src="js/tafeln/ink.js"></script>
+	<script src="js/stapel/faces.js"></script>
+	<script src="js/stapel/panel.js"></script>
+	<script src="js/brenner/nest.js"></script>
+	<script src="js/engrave/gcode.js"></script>
+	<script src="js/brenner/ui.js"></script>
+</body>
+
+</html>

@@ -17,7 +17,7 @@
 	const D = (AE.Deckel = AE.Deckel || {});
 	const F = () => AE.Stapel.Faces;
 
-	const BED = { l: 200, d: 100 };
+	const BED = { l: 196, d: 95 };
 
 	// the face and its measurements in one call, which is what a workbench
 	// wants and a brick does not

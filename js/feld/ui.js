@@ -392,7 +392,7 @@
 		$('exportPng').onclick = () => {
 			const a = document.createElement('a');
 			a.href = Scene.snapshot();
-			a.download = `bremen-${S.year}-feld-${S.places.length}x${S.bricks}x${S.rows}.png`;
+			a.download = `${S.year}-feld-${S.places.length}.png`;
 			a.click();
 			toast('view saved');
 		};
