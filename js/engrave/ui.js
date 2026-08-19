@@ -11,6 +11,7 @@
 	let img = null;          // the source, full size, as an <img> or canvas
 	let plan = null;         // tiles for the current settings
 	let selected = null;     // tile id
+	let srcStats = null;     // the loaded picture's own tonal extremes
 	let view = 'simulation';
 
 	// preview caches. the wall is redrawn on every slider move, so the
@@ -63,11 +64,30 @@
 	async function useBlob(blob, name) {
 		const el = await decode(blob);
 		img = el;
+		srcStats = null;
 		project.image = { name: name || blob.name || 'image', type: blob.type, blob };
 		cache.k = 0; cache.sig = '';
 		Project.note(project, 'source image: ' + project.image.name);
+		fitRange(true);
 		save();
 		refresh();
+	}
+
+	// pull the picture's own black and white points out to the full range.
+	// done on load because a scan that is not fitted never asks the machine
+	// for full power anywhere, and comes back as a haze instead of a picture
+	function fitRange(quiet) {
+		if (!img || !project) return;
+		const r = srcStats || (srcStats = Imaging.autoRange(img));
+		project.laser.inLo = r.lo;
+		project.laser.inHi = r.hi;
+		// the two boxes have to follow immediately even on a quiet fit:
+		// readForm reads the dom, so a stale box would hand the old range
+		// straight back the next time any control is touched
+		$('inLo').value = r.lo;
+		$('inHi').value = r.hi;
+		Project.note(project, `range fitted to the picture: ${r.lo}–${r.hi}`);
+		if (!quiet) { readForm(); toast(`range ${r.lo}–${r.hi}`); }
 	}
 
 	// the three files the piece itself uses, offered as a shortcut. they
@@ -110,7 +130,7 @@
 
 	function laserSig() {
 		const l = project.laser;
-		return [l.mode, l.brightness, l.contrast, l.gamma, l.invert, l.threshold, cache.k].join('|');
+		return [l.mode, l.brightness, l.contrast, l.gamma, l.invert, l.threshold, l.inLo, l.inHi, cache.k].join('|');
 	}
 
 	// resample the source to roughly the size the wall is drawn at, then
@@ -132,25 +152,60 @@
 		if (sig !== cache.sig) {
 			cache.sig = sig;
 			cache.laser = Imaging.process(cache.src, project.laser);
-			// the pale-burn simulation needs the negative of the same pass
-			const inv = Imaging.canvas(cache.laser.width, cache.laser.height);
-			const ix = inv.getContext('2d');
-			ix.filter = 'invert(1)';
-			ix.drawImage(cache.laser, 0, 0);
-			cache.inverted = inv;
+			// the pale-burn simulation needs the ash negative of the same pass
+			cache.inverted = Imaging.burnLayer(cache.laser);
 		}
 	}
 
 	// a handful of clay faces, reused around the wall — a unique texture
 	// per brick is thousands of canvases and reads no differently
 	function clayPool(w, h) {
-		const key = Math.round(w) + 'x' + Math.round(h);
+		const tone = bodyTone();
+		const key = Math.round(w) + 'x' + Math.round(h) + ':' + tone;
 		if (cache.claySize !== key) {
 			cache.claySize = key;
 			cache.clay = Array.from({ length: 10 }, (_, i) =>
-				Imaging.clayTexture(Math.max(2, w), Math.max(2, h), i + 3));
+				Imaging.clayTexture(Math.max(2, w), Math.max(2, h), i + 3, tone));
 		}
 		return cache.clay;
+	}
+
+	const bodyTone = () => (project && project.sim.body) || 'sooty';
+
+	// the tone a fully fired area reaches, as a fill for the burnt word
+	let swatch = null;
+	function scarSwatch() {
+		if (!swatch) {
+			swatch = Imaging.canvas(8, 8);
+			const x = swatch.getContext('2d');
+			x.fillStyle = 'rgb(230,221,201)';
+			x.fillRect(0, 0, 8, 8);
+		}
+		return swatch;
+	}
+	// a dark body swallows a black hairline, so the joint has to switch sides
+	const darkBody = () => bodyTone() !== 'red';
+
+	// the letters as they fall across one brick, filled with whatever should
+	// show through them. the stage draws every tile's scar out of one shared
+	// raster, so the word cannot be cut from it the way the exporter cuts it
+	// — filling the letters with the bare clay lands on the same picture.
+	function wordPatch(t, w, h, fill) {
+		const g = Imaging.wordGeom(project.word, plan.wall);
+		if (!g || !(g.size > 0)) return null;
+		const c = Imaging.canvas(w, h);
+		const x = c.getContext('2d');
+		const sx = c.width / t.w, sy = c.height / t.h;   // on screen a tile has no bleed
+		x.setTransform(sx, 0, 0, sy, -t.x * sx, -t.y * sy);
+		x.font = `700 ${g.size}px ${g.face}`;
+		x.textAlign = 'center';
+		x.textBaseline = 'middle';
+		x.fillStyle = '#fff';
+		x.fillText(g.text, g.cx, g.cy);
+		x.setTransform(1, 0, 0, 1, 0, 0);
+		x.globalCompositeOperation = 'source-in';
+		x.drawImage(fill, 0, 0, c.width, c.height);
+		return c;
 	}
 
 	let layout = null;   // px-per-mm and origin of the last draw, for hit testing
@@ -174,7 +229,7 @@
 		layout = { s };
 
 		// mortar
-		ctx.fillStyle = view === 'source' ? '#2a2724' : '#9c948a';
+		ctx.fillStyle = view === 'source' ? '#2a2724' : darkBody() ? '#5c554f' : '#9c948a';
 		ctx.fillRect(0, 0, cssW, cssH);
 
 		if (!img) {
@@ -202,10 +257,29 @@
 			const sw = (t.w / t.out.w) * t.src.w, sh = (t.h / t.out.h) * t.src.h;
 
 			if (view === 'simulation' || view === 'status') {
-				ctx.drawImage(pool[(t.row * 7 + t.col * 3) % pool.length], dx, dy, dw, dh);
-				ctx.globalCompositeOperation = project.sim.polarity === 'lighter' ? 'screen' : 'multiply';
-				ctx.globalAlpha = project.sim.polarity === 'lighter' ? 0.85 : 1;
-				ctx.drawImage(base, sx * k, sy * k, sw * k, sh * k, dx, dy, dw, dh);
+				const clay = pool[(t.row * 7 + t.col * 3) % pool.length];
+				ctx.drawImage(clay, dx, dy, dw, dh);
+				if (project.sim.polarity === 'lighter') {
+					// the body is the black point and the scar only adds to
+					// it — nothing here may darken a brick. see claySimulate
+					ctx.globalAlpha = Imaging.SCAR_ALPHA;
+					ctx.drawImage(base, sx * k, sy * k, sw * k, sh * k, dx, dy, dw, dh);
+					ctx.globalAlpha = 1;
+					if (project.word.text.trim()) {
+						// cut out: the bare body back through the letters.
+						// burnt: the letters at full scar instead.
+						const cut = project.word.mode !== 'burn';
+						const patch = wordPatch(t, Math.max(2, Math.round(dw)), Math.max(2, Math.round(dh)),
+							cut ? clay : scarSwatch());
+						if (patch) {
+							ctx.globalAlpha = cut ? 1 : Imaging.SCAR_ALPHA;
+							ctx.drawImage(patch, dx, dy, dw, dh);
+						}
+					}
+				} else {
+					ctx.globalCompositeOperation = 'multiply';
+					ctx.drawImage(base, sx * k, sy * k, sw * k, sh * k, dx, dy, dw, dh);
+				}
 				ctx.globalCompositeOperation = 'source-over';
 				ctx.globalAlpha = 1;
 			} else {
@@ -223,7 +297,7 @@
 			}
 
 			if (joints) {
-				ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+				ctx.strokeStyle = darkBody() ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.35)';
 				ctx.lineWidth = 1;
 				ctx.strokeRect(dx + 0.5, dy + 0.5, dw - 1, dh - 1);
 			}
@@ -349,9 +423,11 @@
 		const token = ++thumbToken;
 		if (img) {
 			const w = 360, h = Math.max(1, Math.round(360 * t.out.h / t.out.w));
-			const burned = Imaging.process(Imaging.crop(img, t.src, w, h), project.laser);
+			const burned = Imaging.stampWord(
+				Imaging.process(Imaging.crop(img, t.src, w, h), project.laser),
+				t, plan.wall, project.word);
 			const shown = view === 'simulation'
-				? Imaging.claySimulate(burned, project.sim.polarity, t.row * 7 + t.col * 3 + 3)
+				? Imaging.claySimulate(burned, project.sim.polarity, t.row * 7 + t.col * 3 + 3, bodyTone())
 				: burned;
 			Imaging.toBlob(shown).then(b => {
 				if (token !== thumbToken) return;
@@ -410,7 +486,7 @@
 		const s = Math.min(2200 / plan.wall.w, 2200 / plan.wall.h, 4);
 		const cv = Imaging.canvas(plan.wall.w * s, plan.wall.h * s);
 		const ctx = cv.getContext('2d');
-		ctx.fillStyle = '#9c948a';
+		ctx.fillStyle = darkBody() ? '#5c554f' : '#9c948a';
 		ctx.fillRect(0, 0, cv.width, cv.height);
 		const pool = clayPool(plan.wall.face.w * s, plan.wall.face.h * s);
 		for (const t of plan.list) {
@@ -419,17 +495,15 @@
 			const sx = t.src.x + (t.out.bleed / t.out.w) * t.src.w;
 			const sy = t.src.y + (t.out.bleed / t.out.h) * t.src.h;
 			const sw = (t.w / t.out.w) * t.src.w, sh = (t.h / t.out.h) * t.src.h;
-			const burned = Imaging.process(Imaging.crop(img, { x: sx, y: sy, w: sw, h: sh }, pxW, pxH), project.laser);
+			const burned = Imaging.stampWord(
+				Imaging.process(Imaging.crop(img, { x: sx, y: sy, w: sw, h: sh }, pxW, pxH), project.laser),
+				t, plan.wall, project.word);
 			ctx.drawImage(pool[(t.row * 7 + t.col * 3) % pool.length], dx, dy, dw, dh);
-			ctx.globalCompositeOperation = project.sim.polarity === 'lighter' ? 'screen' : 'multiply';
-			ctx.globalAlpha = project.sim.polarity === 'lighter' ? 0.85 : 1;
 			if (project.sim.polarity === 'lighter') {
-				const inv = Imaging.canvas(pxW, pxH);
-				const ix = inv.getContext('2d');
-				ix.filter = 'invert(1)';
-				ix.drawImage(burned, 0, 0);
-				ctx.drawImage(inv, dx, dy, dw, dh);
+				ctx.globalAlpha = Imaging.SCAR_ALPHA;
+				ctx.drawImage(Imaging.burnLayer(burned), dx, dy, dw, dh);
 			} else {
+				ctx.globalCompositeOperation = 'multiply';
 				ctx.drawImage(burned, dx, dy, dw, dh);
 			}
 			ctx.globalCompositeOperation = 'source-over';
@@ -504,6 +578,8 @@
 			.map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
 		$('face').innerHTML = Object.entries(Tiling.FACES)
 			.map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
+		$('bodyTone').innerHTML = Object.entries(Imaging.BODIES)
+			.map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
 		$('ledgerStatus').innerHTML = '<option value="">every status</option>' +
 			Project.STATUSES.map(s => `<option value="${s}">${s}</option>`).join('');
 	}
@@ -535,7 +611,9 @@
 		$('brightness').value = p.laser.brightness;
 		$('contrast').value = p.laser.contrast;
 		$('gamma').value = Math.round(p.laser.gamma * 100);
-		$('invert').checked = !!p.laser.invert;
+		$('fires').value = p.laser.invert ? 'light' : 'dark';
+		$('inLo').value = p.laser.inLo;
+		$('inHi').value = p.laser.inHi;
 		$('bleed').value = p.laser.bleed;
 		$('gcFeed').value = p.gcode.feed;
 		$('gcPower').value = p.gcode.power;
@@ -547,7 +625,13 @@
 		$('gcOriginX').value = p.gcode.originX;
 		$('gcOriginY').value = p.gcode.originY;
 		$('gcAir').checked = !!p.gcode.airAssist;
+		$('wordText').value = p.word.text;
+		$('wordMode').value = p.word.mode;
+		$('wordSize').value = p.word.size;
+		$('wordX').value = p.word.x;
+		$('wordY').value = p.word.y;
 		$('polarity').value = p.sim.polarity;
+		$('bodyTone').value = p.sim.body;
 		syncOutputs();
 	}
 
@@ -557,8 +641,35 @@
 		$('brightnessV').value = p.laser.brightness;
 		$('contrastV').value = p.laser.contrast + '%';
 		$('gammaV').value = p.laser.gamma.toFixed(2);
+		$('wordSizeV').value = p.word.size + '%';
+		$('wordXV').value = p.word.x + '%';
+		$('wordYV').value = p.word.y + '%';
+		const wg = plan ? Imaging.wordGeom(p.word, plan.wall) : null;
+		$('wordHint').textContent = wg
+			? `set ${fmt(wg.size)} mm tall, ${p.word.mode === 'burn' ? 'burnt over' : 'cut out of'} the picture` +
+			  ` — it runs across the bricks, not inside one.`
+			: 'the ware\u2019s name, laid across the whole wall.';
 		document.querySelectorAll('.thresholdOnly').forEach(el =>
 			el.style.display = p.laser.mode === 'threshold' ? '' : 'none');
+
+		// how much of the available bleach the picture actually asks for.
+		// a plate left unfitted can sit at a few percent and read as a haze,
+		// which is worth saying out loud rather than leaving to be noticed
+		// on the brick.
+		// asked of the picture's own brightest tone, not of the curve: a
+		// curve always reaches full power at 255, but a plate that never
+		// gets near 255 never asks for it
+		if (!img) {
+			$('rangeHint').textContent = 'the range fits itself to a picture the moment one is loaded.';
+		} else {
+			if (!srcStats) srcStats = Imaging.autoRange(img);
+			const lut = Imaging.buildLUT(p.laser);
+			const reach = Math.round(100 * (255 - lut[p.laser.invert ? srcStats.max : srcStats.min]) / 255);
+			$('rangeHint').textContent =
+				`the plate itself runs ${srcStats.min}–${srcStats.max}; read between ${p.laser.inLo} and ${p.laser.inHi}. ` +
+				`its strongest tone asks for ${reach}% of the bleach` +
+				(reach < 70 ? ' — fit the range, or it burns as a haze.' : '.');
+		}
 		const f = Tiling.faceSize(p.brick, p.face);
 		$('faceHint').textContent = `each engraving is ${fmt(f.w)} × ${fmt(f.h)} mm`;
 
@@ -613,7 +724,9 @@
 		p.laser.brightness = Math.round(num($('brightness').value, p.laser.brightness));
 		p.laser.contrast = Math.round(num($('contrast').value, p.laser.contrast));
 		p.laser.gamma = num($('gamma').value, p.laser.gamma * 100) / 100;
-		p.laser.invert = $('invert').checked;
+		p.laser.invert = $('fires').value === 'light';
+		p.laser.inLo = Math.min(254, Math.max(0, Math.round(num($('inLo').value, p.laser.inLo))));
+		p.laser.inHi = Math.min(255, Math.max(p.laser.inLo + 1, Math.round(num($('inHi').value, p.laser.inHi))));
 		p.laser.bleed = Math.max(0, num($('bleed').value, 0));
 		p.gcode.feed = Math.max(1, Math.round(num($('gcFeed').value, p.gcode.feed)));
 		p.gcode.power = Math.min(100, Math.max(0, num($('gcPower').value, p.gcode.power)));
@@ -625,7 +738,13 @@
 		p.gcode.originX = num($('gcOriginX').value, p.gcode.originX);
 		p.gcode.originY = num($('gcOriginY').value, p.gcode.originY);
 		p.gcode.airAssist = $('gcAir').checked;
+		p.word.text = $('wordText').value;
+		p.word.mode = $('wordMode').value;
+		p.word.size = num($('wordSize').value, p.word.size);
+		p.word.x = num($('wordX').value, p.word.x);
+		p.word.y = num($('wordY').value, p.word.y);
 		p.sim.polarity = $('polarity').value;
+		p.sim.body = $('bodyTone').value;
 		syncOutputs();
 		save();
 		refresh();
@@ -695,7 +814,8 @@
 	function bind() {
 		const controls = ['preset', 'bLength', 'bWidth', 'bHeight', 'face', 'cols', 'rows',
 			'gapX', 'gapY', 'fit', 'offsetX', 'offsetY', 'originRow', 'dpi', 'mode',
-			'threshold', 'brightness', 'contrast', 'gamma', 'invert', 'bleed', 'polarity',
+			'threshold', 'brightness', 'contrast', 'gamma', 'fires', 'inLo', 'inHi', 'bleed', 'polarity', 'bodyTone',
+			'wordText', 'wordMode', 'wordSize', 'wordX', 'wordY',
 			'gcFeed', 'gcPower', 'gcLaserMode', 'gcSMax', 'gcPasses', 'gcBidir',
 			'gcOverscan', 'gcOriginX', 'gcOriginY', 'gcAir'];
 		controls.forEach(id => {
@@ -721,10 +841,15 @@
 			toast(`${project.grid.rows} courses — distortion ${plan.win.stretch.toFixed(3)}×`);
 		};
 
+		$('fitRange').onclick = () => fitRange(false);
+
 		$('resetLaser').onclick = () => {
+			const d = Project.blank().laser;
 			Object.assign(project.laser, {
-				brightness: 0, contrast: 120, gamma: 1, invert: false, threshold: 128
+				brightness: d.brightness, contrast: d.contrast, gamma: d.gamma,
+				invert: d.invert, threshold: d.threshold
 			});
+			fitRange(true);
 			syncForm(); readForm();
 		};
 

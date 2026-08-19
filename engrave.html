@@ -6,7 +6,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>engraving desk — anti-epigraph</title>
 	<link rel="icon"
-		href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%231c1a18'/><rect x='2' y='5' width='12' height='6' fill='%23c07a52'/></svg>">
+		href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%231c1a18'/><rect x='2' y='5' width='12' height='6' fill='%237a422a'/><rect x='4' y='7' width='8' height='2' fill='%23e2d8c2'/></svg>">
 	<link rel="stylesheet" href="css/dashboard.css">
 </head>
 
@@ -135,9 +135,41 @@
 				<label>gamma <input type="range" id="gamma" min="20" max="300">
 					<output id="gammaV"></output>
 				</label>
-				<label class="check"><input type="checkbox" id="invert"> invert (burn the light tones)</label>
+				<div class="pair">
+					<label>the picture's black <input type="number" id="inLo" min="0" max="255" step="1"></label>
+					<label>the picture's white <input type="number" id="inHi" min="0" max="255" step="1"></label>
+				</div>
+				<button id="fitRange" class="wide">fit the range to the picture</button>
+				<p class="hint" id="rangeHint">—</p>
+				<label>the laser fires on
+					<select id="fires">
+						<option value="light">the light tones — the picture reads as itself</option>
+						<option value="dark">the dark tones — the ink burns</option>
+					</select>
+				</label>
 				<label>bleed <input type="number" id="bleed" min="0" max="20" step="0.5"><i>mm past the edge</i></label>
 				<button id="resetLaser" class="wide">reset the levels</button>
+			</section>
+
+			<section>
+				<h2>the word</h2>
+				<label>the ware <input type="text" id="wordText" placeholder="TABACK" autocomplete="off"></label>
+				<label>it reads
+					<select id="wordMode">
+						<option value="mask">cut out — bare brick letters in the picture</option>
+						<option value="burn">burnt — pale letters over the picture</option>
+					</select>
+				</label>
+				<label>width <input type="range" id="wordSize" min="5" max="140">
+					<output id="wordSizeV"></output>
+				</label>
+				<label>across <input type="range" id="wordX" min="0" max="100">
+					<output id="wordXV"></output>
+				</label>
+				<label>down <input type="range" id="wordY" min="0" max="100">
+					<output id="wordYV"></output>
+				</label>
+				<p class="hint" id="wordHint">—</p>
 			</section>
 
 			<section>
@@ -168,12 +200,22 @@
 
 			<section>
 				<h2>simulation</h2>
+				<label>brick body
+					<select id="bodyTone"></select>
+				</label>
 				<label>the burn reads
 					<select id="polarity">
+						<option value="lighter">lighter — a pale ash scar</option>
 						<option value="darker">darker — soot and char</option>
-						<option value="lighter">lighter — cut back to the body</option>
 					</select>
 				</label>
+				<p class="hint">our stock is dark and firing the laser bleaches it pale, so the
+					only thing that can come out light is what the head actually burns. to
+					get a picture that reads <em>as itself</em> — not as a negative — the head
+					has to fire on its <em>light</em> tones: the bright parts become pale scar,
+					the dark parts are simply left as bare brick. that is the default, and it
+					is set under <em>laser</em>. fire on the dark tones instead only for
+					black-on-white artwork you want burnt as drawn.</p>
 				<p class="hint">test one brick before you commit to a wall.</p>
 			</section>
 

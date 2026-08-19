@@ -141,7 +141,10 @@
 	// a handful of clay faces, reused around the field — a unique texture
 	// per brick is a hundred canvases and reads no differently
 	function clayPool() {
-		if (!clayPool.list) clayPool.list = Array.from({ length: 8 }, (_, i) => Imaging.clayTexture(240, 120, i + 3));
+		// 'red' pins the pallets desk to the old pale terracotta body — the
+		// engraving desk moved to the dark stock we actually cut on, and the
+		// two should not drift apart by accident
+		if (!clayPool.list) clayPool.list = Array.from({ length: 8 }, (_, i) => Imaging.clayTexture(240, 120, i + 3, 'red'));
 		return clayPool.list;
 	}
 

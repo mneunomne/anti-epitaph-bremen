@@ -19,11 +19,22 @@
 			preset: 'nf',
 			brick: { length: b.length, width: b.width, height: b.height },
 			face: 'stretcher',
-			gap: { x: 10, y: 12 },
-			grid: { cols: 8, rows: 10, fit: 'cover', offsetX: 0, offsetY: 0, originRow: 'bottom' },
+			// the bricks butt up against each other: a 1 mm hairline, not a
+			// mortar joint. the wall is a plate of bricks, not masonry.
+			gap: { x: 1, y: 1 },
+			grid: { cols: 6, rows: 8, fit: 'cover', offsetX: 0, offsetY: 0, originRow: 'bottom' },
+			// invert is on because the artwork is a negative: a black ground
+			// with white marks. white is what the laser fires on, and firing
+			// is what comes back pale on a dark brick — so the white in the
+			// file is the only thing you will be able to read on the wall.
 			laser: {
 				dpi: 254, mode: 'grayscale', brightness: 0, contrast: 120, gamma: 1,
-				invert: false, threshold: 128, bleed: 0
+				invert: true, threshold: 128, bleed: 0,
+				// the picture's own black and white point. these are fitted to
+				// the plate the moment one is loaded, because a scan almost
+				// never fills the range it is given and an unfitted one burns
+				// as a haze — see Imaging.autoRange
+				inLo: 0, inHi: 255
 			},
 			// the machine itself. defaults are the longer / grbl profile:
 			// 254 dpi is 0.1 mm, which is the 10 lines/mm the controller wants
@@ -32,7 +43,13 @@
 				bidirectional: true, overscan: 0, scanOffset: 0, airAssist: true,
 				originX: 0, originY: 0, park: true
 			},
-			sim: { polarity: 'darker' },
+			// our stock is dark, flashed red and the laser cuts back to a pale
+			// ash scar — the burn reads lighter, not darker
+			// the ware's name, cut out of the picture rather than drawn on
+			// it: the letters are the one place the head does not fire, so
+			// they stand as bare brick inside the bleached picture
+			word: { text: '', mode: 'mask', size: 70, x: 50, y: 50, caps: true },
+			sim: { polarity: 'lighter', body: 'sooty' },
 			image: null,          // { name, type, blob }
 			tiles: {},            // id -> { status, date, operator, passes, notes }
 			log: []
@@ -48,6 +65,7 @@
 		p.grid = Object.assign({}, base.grid, p.grid);
 		p.laser = Object.assign({}, base.laser, p.laser);
 		p.gcode = Object.assign({}, base.gcode, p.gcode);
+		p.word = Object.assign({}, base.word, p.word);
 		p.sim = Object.assign({}, base.sim, p.sim);
 		p.tiles = p.tiles || {};
 		p.log = p.log || [];

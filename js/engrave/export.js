@@ -186,7 +186,10 @@ before you send a .${gcExt()}
 
 			const pxW = Tiling.mmToPx(t.out.w, dpi), pxH = Tiling.mmToPx(t.out.h, dpi);
 			const cropped = Imaging.crop(img, t.src, pxW, pxH);
-			const burned = Imaging.process(cropped, project.laser);
+			// the word is cut into the raster here, not painted over the
+			// preview: what leaves in the zip is what the head will trace
+			const burned = Imaging.stampWord(
+				Imaging.process(cropped, project.laser), t, plan.wall, project.word);
 			const blob = await Imaging.toBlob(burned, 'image/png');
 			const bytes = new Uint8Array(await blob.arrayBuffer());
 
