@@ -79,6 +79,65 @@
 		{ k: 'valRule', min: 0, max: 3, step: 0.1, unit: ' mm', label: 'before the Werth, where it is beside it' },
 	];
 
+	/* ------------------------------ the two faces of a stack cut by good */
+
+	// The same settings again for the other cut of the volume. Most of them are
+	// the same setting — a size is a size and a head is a head — but the two
+	// faces have swapped their work, so the list has to say so: there is a head
+	// over the places and none over the goods, the Werth is never round a
+	// corner from its quantity, and the margin that matters most is the one
+	// that is not there, at the arris where the line crosses.
+	const WARE = [
+		{ k: 'display', kind: 'face', label: 'the good — display face' },
+		{ k: 'text', kind: 'face', label: 'the places — text face' },
+		{ k: 'figFace', kind: 'face', same: 'as the places', label: 'the figures' },
+
+		{ note: 'the places and their figures — both a share of the row they sit in' },
+		{ k: 'goodsSize', min: 20, max: 95, step: 1, unit: '%', label: 'the place names' },
+		{ k: 'goodsWeight', kind: 'select', opts: WEIGHTS, label: 'the names’ weight' },
+		{ k: 'figSize', min: 20, max: 95, step: 1, unit: '%', label: 'the Quantum and Werth figures' },
+		{ k: 'figWeight', kind: 'select', opts: WEIGHTS, label: 'the figures’ weight' },
+
+		{ note: 'the money' },
+		{
+			k: 'currency', kind: 'select', label: 'the money is', opts: [
+				['none', 'not said'],
+				['first', 'said once, dittoed under it'],
+				['every', 'said on every line']],
+		},
+		{ k: 'mark', kind: 'text', label: 'and called' },
+		{ k: 'markDitto', kind: 'text', label: 'the ditto under it' },
+		{ k: 'markSize', min: 20, max: 120, step: 1, unit: '%', label: 'the money, of the figure' },
+		{ k: 'markGap', min: 0, max: 10, step: 0.2, unit: ' mm', label: 'before the money' },
+
+		{ note: 'the head line — the table’s first row, standing across both faces at once. A stack is one table, so it is on the top brick and takes a line of it; the courses under it are full.' },
+		{ k: 'heads', kind: 'check', label: 'a head line over the columns' },
+		{ k: 'headLand', kind: 'text', label: 'over the places it reads' },
+		{ k: 'headQuantum', kind: 'text', label: 'over the quantities' },
+		{ k: 'headWerth', kind: 'text', label: 'over the values' },
+		{ k: 'headFace', kind: 'face', same: 'as the places', label: 'the head’s face' },
+		{
+			k: 'headStyle', kind: 'select', label: 'and its cut', opts: [
+				['italic', 'italic, as “Werth im Ganzen”'], ['normal', 'upright']],
+		},
+		{ k: 'headWeight', kind: 'select', opts: WEIGHTS, label: 'the head’s weight' },
+		{ k: 'headSize', min: 50, max: 170, step: 2, unit: '%', label: 'the head’s size' },
+		{ k: 'headTrack', min: 0, max: 30, step: 0.5, unit: '%', label: 'the head’s tracking' },
+		{ k: 'headRule', min: 0, max: 4, step: 0.1, unit: ' mm', label: 'the rule under it' },
+
+		{ note: 'the assembly mark — the good, the brick counting down from the top, and the face: b the long face in view, c the small one beside it, d and e the pair round the back. The bed is a and goes unmarked.' },
+		{ k: 'tags', kind: 'check', label: 'mark every printed side' },
+		{ k: 'tagSize', min: 0, max: 8, step: 0.1, unit: ' mm', label: 'the mark' },
+		{ k: 'tagTop', min: 0, max: 8, step: 0.1, unit: ' mm', label: 'down from the top edge' },
+
+		{ note: 'the margins, and the edge the reading crosses' },
+		{ k: 'arris', kind: 'check', label: 'the dots and the rule run on to the arris' },
+		{ k: 'headerPad', min: 0, max: 30, step: 0.5, unit: ' mm', label: 'before the place names' },
+		{ k: 'padX', min: 0, max: 30, step: 0.5, unit: ' mm', label: 'after the Werth' },
+		{ k: 'padY', min: 0, max: 12, step: 0.5, unit: ' mm', label: 'over and under the rows' },
+		{ k: 'valRule', min: 0, max: 3, step: 0.1, unit: ' mm', label: 'before the Werth' },
+	];
+
 	/* ------------------------------------------------------------ the bed */
 
 	const BED = [
@@ -176,5 +235,5 @@
 		});
 	}
 
-	S.Panel = { FACE, BED, PRESS, WEIGHTS, build };
+	S.Panel = { FACE, WARE, BED, PRESS, WEIGHTS, build };
 })(window);

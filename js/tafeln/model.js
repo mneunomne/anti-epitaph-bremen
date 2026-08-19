@@ -234,6 +234,11 @@
 		return Object.keys(BOOK()).sort();
 	}
 
+	// what the volume calls each place, by its id — wanted wherever a place has
+	// to be named outside a block it stands in, as a struck-out one is
+	const placeNames = year => new Map(
+		(((BOOK()[year] || {}).places) || []).map(p => [p.id, p.de]));
+
 	// Two printed tables cover the same goods, and a block has to come off one
 	// of them or the other — never both. The per-country lists (the
 	// *Waarenverzeichniss der Einfuhr*) are much the finer of the two:
@@ -353,6 +358,110 @@
 		return out;
 	}
 
+	/* ---------------------------------------------------------------- wares */
+
+	// The volume turned once more. plates() asks what a place sent; this asks
+	// who sent a good, and it is the same body of figures read from the third
+	// end. A cell is one place, one good, one measure, and which block it is
+	// filed under changes nothing about it — so the two cuts agree cell for
+	// cell and on the grand sum, and the same rule picks the printing: a place
+	// the country lists reach is taken from them entire, and the by-article
+	// table fills only the places they never reached.
+	//
+	// The good's name carries the whole weight here, because it is what the
+	// blocks are cut on: down one place's block a name only has to be itself,
+	// but across the volume it has to be the same name everywhere it stands.
+	// Underscores are an artefact of the extraction — "Taback_Havana" is a
+	// sub-heading the by-article table sets on two lines — and go back to
+	// spaces. Nothing else is touched, and in these five volumes that merges
+	// no two names that were not already the one name.
+	const wareName = s => String(s == null ? '' : s)
+		.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+
+	// A good's class is the good's, not the place's, so every row of a block
+	// carries the block's own class and a filter by class takes whole blocks.
+	// That is why `cats` is not an option here as it is on plates(): there is
+	// nothing in a block for it to cut. The page filters the list instead, and
+	// can say how many goods each class holds while it does it.
+	function wares(year, opts) {
+		const vol = BOOK()[year];
+		if (!vol) return [];
+		const o = opts || {};
+		const rawUnits = !!o.rawUnits;
+		const names = new Map((vol.places || []).map(p => [p.id, p.de]));
+
+		const byWare = new Map();
+		for (const { r: a, unit: resolved, from } of sourceRows(vol)) {
+			const title = wareName(a.article);
+			if (!title) continue;
+			let w = byWare.get(title);
+			if (!w) byWare.set(title, (w = { title, rows: new Map(), pages: new Set(), from: new Set() }));
+
+			const unit = rawUnits ? String(a.unit == null ? '' : a.unit).trim() : resolved;
+			// the same cut as plates() makes, named the other way round: there
+			// a good twice in a place's block was one good, here a place twice
+			// in a good's block is one place
+			const key = a.place + ' ' + unit;
+			const seen = w.rows.get(key);
+			if (seen) {
+				seen.qty = seen.qty == null && a.qty == null ? null : (seen.qty || 0) + (a.qty || 0);
+				seen.value = seen.value == null && a.value == null ? null : (seen.value || 0) + (a.value || 0);
+				seen.merged++;
+			} else {
+				w.rows.set(key, {
+					place: a.place,
+					title: names.get(a.place) || a.raw || a.place,
+					qty: a.qty, unit, value: a.value, merged: 0,
+				});
+			}
+			w.from.add(from);
+			if (a.page != null) w.pages.add(a.page);
+		}
+
+		// places struck out by hand, everywhere they appear, and a floor under
+		// the Werth — the same two cuts the by-place blocks take, turned round.
+		// A place the page never valued is not small, only unknown, so a dash
+		// is never cut by the floor.
+		const skip = o.exclude && o.exclude.length ? new Set(o.exclude) : null;
+		const floor = Number.isFinite(o.minValue) && o.minValue > 0 ? o.minValue : 0;
+
+		const out = [];
+		for (const w of byWare.values()) {
+			const all = [...w.rows.values()];
+			const rows = all.filter(r =>
+				(!skip || !skip.has(r.place)) &&
+				(!floor || !Number.isFinite(r.value) || r.value >= floor));
+			rows.sort((a, b) => (b.value || 0) - (a.value || 0) || a.title.localeCompare(b.title, 'de'));
+			const known = rows.filter(r => Number.isFinite(r.value));
+			const total = known.length ? known.reduce((s, r) => s + r.value, 0) : null;
+			const everything = all.filter(r => Number.isFinite(r.value));
+			const full = everything.length ? everything.reduce((s, r) => s + r.value, 0) : null;
+			const from = [...w.from];
+
+			out.push({
+				axis: 'ware',                                // which way the volume was cut
+				id: w.title,                                 // the name is the key
+				title: w.title,
+				cat: category(w.title),
+				rows,
+				all: all.length,
+				full,
+				share: full ? (total || 0) / full : 1,
+				hidden: all.length - rows.length,
+				filtered: all.length !== rows.length,
+				// the sum of what came in under this one name, and nothing else
+				total,
+				partial: known.length !== rows.length,       // some figure is a dash
+				pages: [...w.pages].sort((a, b) => a - b),
+				// a good may stand in both printings, under different places
+				source: from.length === 1 ? from[0] : 'gemischt',
+				year,
+			});
+		}
+		out.sort((a, b) => (b.total || 0) - (a.total || 0) || a.title.localeCompare(b.title, 'de'));
+		return out;
+	}
+
 	// what the sum at the foot is honestly called. A filtered block does not
 	// show what the place sent — it shows what it sent in the classes asked
 	// for — and the line has to say so.
@@ -362,7 +471,7 @@
 				: 'Werth im Ganzen';
 
 	T.Model = {
-		years, plates, normalise, resolveUnits, isNetto, figure, NETTO,
+		years, plates, wares, placeNames, normalise, resolveUnits, isNetto, figure, NETTO,
 		category, CATEGORIES, DEFAULT_CATS, totalLabel,
 	};
 })(window);
