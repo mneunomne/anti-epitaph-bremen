@@ -96,7 +96,7 @@
 			if (o.outline !== false) {
 				const line = new THREE.LineSegments(
 					new THREE.EdgesGeometry(brick.geometry),
-					new THREE.LineBasicMaterial({ color: o.ink || '#12100e' })
+					new THREE.LineBasicMaterial({ color: o.outlineColour || '#33190f' })
 				);
 				line.position.copy(brick.position);
 				g.add(line);

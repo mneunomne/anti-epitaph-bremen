@@ -1,17 +1,28 @@
 /* faces.js — what is printed on a brick.
  *
- * A brick is 196 × 95 × 45. Laid as a stretcher it shows three faces to
- * anyone standing in front of it, and this page uses two of them plus the
- * bed of the topmost course:
+ * A brick is 196 × 95 × 45, and a course of them can be cut either way the
+ * volume can. Cut by place — which is what das Feld prints — a brick carries
  *
  *   the stretcher, 196 × 45 — the goods, name run out to its quantity
  *   the header,    95 × 45 — the value of those same goods, flush right
  *   the bed,       196 × 95 — the place, and where it was read
  *
- * Three goods to a brick, so the stack grows with what the place actually
- * sent: Brasilien 1851 at 25 goods stands nine courses high, Java at three
- * stands one. The rows on the header line up with the rows on the stretcher
- * because both are the same 50 deep and cut the same way.
+ * Cut by good, which is how der Stapel now stands, the two working faces
+ * change places and the reading turns the corner the other way:
+ *
+ *   the small face, 95 × 45 — the places, run out on dots to the arris
+ *   the long face, 196 × 45 — the dots again, then the quantity and the Werth
+ *
+ * Of the four upright faces a stack shows two at once, and they are the two
+ * that meet at the arris nearest the eye: the small one on the left, the long
+ * one on the right. So a line begun on the small face and carried over the
+ * edge is one line — the place, the dots, the quantity, the value — and no
+ * one has to walk round the stack to finish reading a row.
+ *
+ * Three rows to a brick either way, so the stack grows with what the volume
+ * actually has: Wein 1851 came from 25 places and stands nine courses high,
+ * a good one place sent stands one. The rows on the two faces line up
+ * because both are the same 45 deep and cut the same way.
  *
  * Everything here is written in millimetres and multiplied up to pixels on
  * the way out, so the texture can be made as fine as the machine will hold
@@ -31,8 +42,31 @@
 	const DEFAULTS = {
 		ppmm: 8,                 // texture resolution
 		rows: 3,                 // goods to a brick
-		clay: '#d98741',
-		ink: '#12100e',
+		// The stock as it actually is, and what a head can do to it.
+		//
+		// These bricks are the dark flashed red of the brenntisch, not the
+		// bright terracotta a brick gets drawn as — and the engraver cannot
+		// put a dark mark on them. It only bleaches. So everything printed
+		// here is pale on dark and never ink on clay: a table down a side is
+		// cut by the same head as the picture on the bed, and comes back the
+		// same colour it does.
+		//
+		// AE.Imaging.bodyColour('sooty') and .scarColour('sooty') are where
+		// these two numbers come from; they are written out because das Feld
+		// and der Deckel draw bricks without loading the engraving code.
+		clay: '#5e3321',
+		ink: '#d2c3b9',
+		// The line drawn along an edge is not printing. It is the shadow in
+		// the crease where two faces of a brick meet, and it belongs to the
+		// block rather than to anything cut into it — so it stays dark
+		// whatever the head does. It used to be taken from `ink`, which was
+		// harmless only while ink happened to be black: the moment the
+		// printing went pale every brick came out wired in white.
+		//
+		// Named for the `outline` switch that turns it on, and deliberately
+		// not `arris` — that is already the quite separate question of
+		// whether a dotted leader runs over the edge.
+		outlineColour: '#33190f',
 		display: 'ultra',
 		text: 'libre-bodoni',
 		padX: 7,
@@ -68,12 +102,14 @@
 		markGap: 2,              // mm
 
 		// The heads of the columns, set on the faces the columns are actually
-		// on and set as a first line — Waare and Quantum over the stretcher,
-		// the Werth over the header — with a rule under them, which is what a
-		// printed table does. A head on the bed above named a column the eye
-		// had to go round a corner to find; a head up the edge did not read as
-		// a head at all. The line is taken out of the face, so a head costs a
-		// little of every row rather than a whole row of goods.
+		// on and set as a first line, with a rule under them, which is what a
+		// printed table does. Cut by place that is Waare and Quantum over the
+		// stretcher and the Werth over the header; cut by good it is Land over
+		// the small face and Quantum and Werth over the long one, and the rule
+		// crosses the arris with them. A head on the bed above named a column
+		// the eye had to go round a corner to find; a head up the edge did not
+		// read as a head at all. The line is taken out of the face, so a head
+		// costs a little of every row rather than a whole row of rows.
 		heads: true,
 		// Whether this face is the top of its table. A face drawn on its own is
 		// its own top; in a stack, only the first course is, and it is the
@@ -93,21 +129,41 @@
 		headTrack: 8,            // per cent of the size
 		headRule: 0.6,           // mm, under the head
 		headWaare: 'Waare',
+		headLand: 'Land',        // over the places, where the stack is cut by good
 		headQuantum: 'Quantum',
 		headWerth: 'Werth',
 		headerLeaders: true,     // dots across the header to its figure
 
-		// The header is a face of its own and takes its own margin — it is
-		// where the Werth stands flush right, and how far in from the arris
-		// that is is the whole look of the column.
-		headerPad: 7,            // mm, each side of the header face
+		// Where the two faces of a reading meet. The name is run out on dots
+		// that go over the edge of the small face and pick up again on the long
+		// one, so the row reads as a single line bent round a corner rather than
+		// as two columns that happen to be near each other — which is the whole
+		// argument for printing a table on a solid. Set false and each face
+		// keeps its own margin, and the line stops twice.
+		arris: true,
+
+		// The small face is a face of its own and takes its own margin. Cut by
+		// place it is where the Werth stands flush right, and how far in from
+		// the arris that is is the whole look of the column; cut by good it is
+		// where the place names begin, and only the outer side of it is a
+		// margin at all — the inner side is the arris the dots go over.
+		headerPad: 7,            // mm, the small face's own margin
 
 		// The rules between the columns. The dots do the work of carrying the
 		// eye across, and a rule in their way stops them short of the figure
 		// they are running to, so by default there is none between the goods
 		// and the Quantum.
 		colRule: 0,              // mm, between the Waare and the Quantum
-		valRule: 0.5,            // mm, before the Werth where it is on the stretcher
+		valRule: 0.5,            // mm, before the Werth wherever it stands beside a Quantum
+
+		// The largest Werth anywhere in the stack. A face can only measure the
+		// three figures it is carrying, and a column measured that way is a
+		// different width on every course — which nobody would notice on a
+		// page, where the courses are lines of one table, but which on a stack
+		// puts a jog in a rule that runs down six bricks. So the builder
+		// measures the stack and tells every face what to leave room for.
+		// Unset, a face falls back to measuring itself.
+		valMax: null,
 
 		// The bed, all in millimetres — it is a fixed 196 × 95 whatever a brick
 		// is carrying, so here a size is a size. This is the setting worked out
@@ -150,10 +206,10 @@
 		// The assembly mark. Cut and engraved, a yard is a heap of identical
 		// rectangles of card, and nothing on a face says which brick it came
 		// off or which way round it goes. So each printed side carries its
-		// place, the brick's number counting down from the top, and the letter
-		// of the face — br.1b — set small in the head margin where nothing
-		// else stands. The bed is a, and is not marked: it is the only face
-		// that is obviously itself.
+		// block, the brick's number counting down from the top, and the letter
+		// of the face — br.1b, ca.1b — set small in the head margin where
+		// nothing else stands. The bed is a, and is not marked: it is the only
+		// face that is obviously itself.
 		tags: true,
 		tag: '',                 // the mark for this face, composed by the builder
 		tagSize: 2.2,            // mm
@@ -204,19 +260,26 @@
 	}
 
 	// worked out once a volume and kept, so every page marks the same brick
-	// the same way without having to be told to
+	// the same way without having to be told to. A volume cut by good is a
+	// different list of blocks and gets its own marks — ca.3b is Caffee's
+	// third brick in one yard and Carthagena's in the other, and neither list
+	// is allowed to disturb the other's letters.
 	const NAMED = {};
-	function namesFor(year) {
-		if (!NAMED[year]) {
-			try { NAMED[year] = uniqueInitials(T.Model.plates(year, {})); }
-			catch (e) { NAMED[year] = {}; }
+	function namesFor(year, axis) {
+		const k = (axis === 'ware' ? 'w' : 'p') + year;
+		if (!NAMED[k]) {
+			try {
+				NAMED[k] = uniqueInitials(axis === 'ware'
+					? T.Model.wares(year, {}) : T.Model.plates(year, {}));
+			}
+			catch (e) { NAMED[k] = {}; }
 		}
-		return NAMED[year];
+		return NAMED[k];
 	}
 
-	// br.1b — the place, the brick counting down from the top, the face
+	// br.1b — the block, the brick counting down from the top, the face
 	const tagFor = (plate, n, letter) =>
-		`${namesFor(plate.year)[plate.id] || initials(plate.title)}.${n}${letter}`;
+		`${namesFor(plate.year, plate.axis)[plate.id] || initials(plate.title)}.${n}${letter}`;
 
 	// set in the margin over the head, where no face has anything else
 	function stamp(x, o, P, wmm) {
@@ -259,6 +322,12 @@
 			}), o.ppmm / 4);
 		return c;
 	}
+
+	// What a row is called. Cut by place a row is a good and is called by its
+	// article; cut by good a row is a place and is called by its own name. The
+	// faces do not otherwise care which way the volume was turned, so this is
+	// the only place that has to know.
+	const rowName = r => String((r && (r.title || r.article)) || '');
 
 	function fit(x, text, w) {
 		if (x.measureText(text).width <= w) return text;
@@ -357,6 +426,8 @@
 			markW = markCol(x, o, P, fsize);
 			x.font = fig;
 			valW = x.measureText('000,000').width;
+			if (Number.isFinite(o.valMax))
+				valW = Math.max(valW, x.measureText(figure(o.valMax)).width);
 			for (let i = 0; i < H.rows; i++) {
 				const r = rows[i];
 				if (r) valW = Math.max(valW, x.measureText(figure(r.value)).width);
@@ -536,11 +607,182 @@
 		return pressed(c, o);
 	}
 
+	/* ------------------------------- cut by good: the small face, 95 × 45 */
+
+	// The places, one to a row, flush left and run out on dots to the arris —
+	// where the line picks up again on the long face and carries the eye on to
+	// the figures. Nothing else stands here: the small face is a column of
+	// names and its whole width is the name's, which is what a place needs and
+	// what it never had when it was a title squeezed onto a bed.
+	//
+	// The rows are cut exactly as the long face cuts them — the same 45 deep,
+	// the same head band, the same baseline — so a row that begins here ends
+	// there without stepping up or down over the edge.
+	function land(rows, o) {
+		o = opt(o);
+		const { c, x, P } = surface(BRICK.d, BRICK.h, o);
+		const H = headBand(o, BRICK.h);
+		const rowH = H.rowH;
+		const size = rowH * (o.goodsSize / 100);
+		const fsize = rowH * (o.figSize / 100);
+		const line = Math.max(size, fsize);       // the baseline the long face uses too
+		const pad = Number.isFinite(o.headerPad) ? o.headerPad : o.padX;
+		const left = P(pad);
+		// the edge the reading leaves by: the arris itself, or the face's own
+		// margin where the line is not asked to cross it
+		const edge = P(BRICK.d - (o.arris ? 0 : pad));
+
+		// the head over the names, set from the left margin as the names are,
+		// and its rule carried out to the arris with them
+		if (H.shown) {
+			headFont(x, o, P, H.size);
+			x.textAlign = 'left';
+			x.fillText(o.headLand, left, P(H.base));
+			x.letterSpacing = '0px';
+			if (o.headRule > 0)
+				x.fillRect(left, P(H.top - o.headRule), edge - left, P(o.headRule));
+		}
+
+		for (let i = 0; i < H.rows; i++) {
+			const r = rows[i];
+			if (!r) continue;
+			const y = P(H.top + rowH * i + rowH * 0.5 + line * 0.36);
+			x.font = `${o.goodsWeight} ${P(size)}px ${face(o.text)}`;
+			x.textAlign = 'left';
+			// a long name is clipped rather than allowed to reach the arris:
+			// the dots have to start somewhere or the line does not read as a
+			// line at all
+			const name = fit(x, rowName(r), edge - left - P(5));
+			x.fillText(name, left, y);
+			leaders(x, left + x.measureText(name).width + P(2.5), edge,
+				y - P(size * 0.28), P(size));
+		}
+		stamp(x, o, P, BRICK.d);
+		return pressed(c, o);
+	}
+
+	/* -------------------------------- cut by good: the long face, 196 × 45 */
+
+	// What that place sent of this good: the quantity in the measure the
+	// volumes reckoned it by, and the Werth flush right. The dots come over
+	// the arris from the name and run on to the first figure of the quantity,
+	// which is right-aligned — so where that figure falls is a different place
+	// on every line, and the dots are cut to each.
+	//
+	// Both figures stand on the one face on purpose. A quantity and a value
+	// are the two halves of one statement — 800,677 Ld'or is only a fact
+	// beside the pounds it was paid for — and nothing is served by making
+	// someone walk round a stack to put them together.
+	function figures(rows, o) {
+		o = opt(o);
+		const { c, x, P } = surface(BRICK.l, BRICK.h, o);
+		const H = headBand(o, BRICK.h);
+		const rowH = H.rowH;
+		const size = rowH * (o.goodsSize / 100);
+		const fsize = rowH * (o.figSize / 100);
+		const line = Math.max(size, fsize);
+		const fig = `${o.figWeight} ${P(fsize)}px ${figFace(o)}`;
+		// where the dots come over from the small face, and where the Werth ends
+		const left = P(o.arris ? 0 : o.padX);
+		const right = P(BRICK.l - o.padX);
+
+		// The Werth column, measured before anything is drawn. It starts at the
+		// width of a seven-figure sum whatever this brick happens to carry, so
+		// that the column falls in the same place on every brick of a stack —
+		// a rule that wandered from course to course would be worse than a
+		// column slightly too wide. A larger figure still widens it.
+		const markW = markCol(x, o, P, fsize);
+		x.font = fig;
+		let valW = x.measureText('000,000').width;
+		if (Number.isFinite(o.valMax))
+			valW = Math.max(valW, x.measureText(figure(o.valMax)).width);
+		for (let i = 0; i < H.rows; i++) {
+			const r = rows[i];
+			if (r) valW = Math.max(valW, x.measureText(figure(r.value)).width);
+		}
+		valW += markW + P(5);
+
+		// how far the quantities and their measures actually reach — what the
+		// Quantum head has to stand over
+		let qtyBlock = 0;
+		for (let i = 0; i < H.rows; i++) {
+			const r = rows[i];
+			if (!r) continue;
+			const u = r.unit || '';
+			qtyBlock = Math.max(qtyBlock, x.measureText(figure(r.qty)).width
+				+ (u ? P(2.5) + x.measureText(u).width : 0));
+		}
+
+		// the rule before the Werth, standing under the head as the column
+		// rules do in the volumes
+		const valX = BRICK.l - o.padX - valW / o.ppmm;
+		const ruleTop = H.shown ? H.top : o.padY * 0.4;
+		if (o.valRule > 0)
+			x.fillRect(P(valX + 2.5), P(ruleTop), Math.max(1, P(o.valRule)),
+				P(BRICK.h - o.padY * 0.4 - ruleTop));
+
+		// the head line — the Quantum over the figures that carry it and the
+		// Werth over the values, and the rule under both picked up at the arris
+		if (H.shown) {
+			headFont(x, o, P, H.size);
+			const hy = P(H.base);
+			const qtyEnd = right - valW;
+			headMid(x, o, P, H.size, o.headQuantum,
+				Math.max(left, qtyEnd - qtyBlock), qtyEnd, hy);
+			headMid(x, o, P, H.size, o.headWerth, P(valX) + P(2.5), right, hy);
+			x.letterSpacing = '0px';
+			if (o.headRule > 0)
+				x.fillRect(left, P(H.top - o.headRule), right - left, P(o.headRule));
+		}
+
+		for (let i = 0; i < H.rows; i++) {
+			const r = rows[i];
+			if (!r) continue;
+			// the baseline sits a little under the middle of its row, exactly
+			// where the small face puts the name it belongs to
+			const y = P(H.top + rowH * i + rowH * 0.5 + line * 0.36);
+
+			const qty = figure(r.qty);
+			const unit = r.unit || '';
+			x.font = fig;
+			x.textAlign = 'right';
+			const unitW = unit ? x.measureText(unit).width + P(2.5) : 0;
+			const qtyRight = right - unitW - valW;
+			const qtyLeft = qtyRight - x.measureText(qty).width;
+			x.fillText(qty, qtyRight, y);
+			if (unit) {
+				x.textAlign = 'left';
+				x.fillText(unit, qtyRight + P(2.5), y);
+			}
+
+			x.font = fig;
+			x.textAlign = 'right';
+			x.fillText(figure(r.value), right - markW, y);
+			const mk = markFor(o, i);
+			if (mk) {
+				x.font = `400 ${P(fsize * o.markSize / 100)}px ${face(o.text)}`;
+				x.textAlign = 'left';
+				x.fillText(mk, right - markW + P(o.markGap), y);
+			}
+
+			// the dots, at the size and rhythm the small face set them, so the
+			// two runs read as one line and not as two habits
+			leaders(x, left, qtyLeft - P(2.5), y - P(size * 0.28), P(size));
+		}
+		stamp(x, o, P, BRICK.l);
+		return pressed(c, o);
+	}
+
 	/* ------------------------------------------------------ the bed, 200×100 */
 
 	// "Waarenverzeichniss · 1851 · S. 141" — which printing, and which pages
 	function sourceLine(plate) {
-		const src = plate.source === 'verzeichniss' ? 'Waarenverzeichniss' : 'nach Artikeln';
+		// a place comes off one printing or the other; a good, standing over
+		// many places, may come off both, and the line says so rather than
+		// picking one
+		const src = plate.source === 'verzeichniss' ? 'Waarenverzeichniss'
+			: plate.source === 'gemischt' ? 'beide Verzeichnisse'
+				: 'nach Artikeln';
 		const pp = plate.pages && plate.pages.length
 			? ` · S. ${plate.pages[0]}${plate.pages.length > 1 ? '–' + plate.pages[plate.pages.length - 1] : ''}`
 			: '';
@@ -641,6 +883,124 @@
 		return pressed(c, o);
 	}
 
+	/* ------------------------------------------------ the bed as a picture */
+
+	// The tops of a yard are one plate, not forty-eight.
+	//
+	// Where the sides of a stack are printed pages, the bed can instead be a
+	// piece of the engraving: the picture set up on the brenntisch is laid
+	// across the whole footprint of the yard, and each top brick is cut its
+	// own square of it by where it happens to stand. Walk round the yard and
+	// the tops assemble into one image; take a brick away and it carries its
+	// square with it.
+	//
+	// The good's name is not printed over that picture — it is taken out of
+	// it. Where a letter falls the head does not fire, so the name stands as
+	// the bare brick the top started as, holding the shape of the picture
+	// round it. That is the same cut the brenntisch makes, and it is made
+	// here on the burn raster for the same reason: a name that were only
+	// drawn on afterwards would not survive being sent to the machine.
+	function bedPicture(plate, o) {
+		const Img = AE.Imaging;
+		const pic = o.picture;
+		if (!Img || !pic || !pic.img) return null;
+		const r = o.bedRect || { u0: 0, v0: 0, u1: 1, v1: 1 };
+
+		const pxW = Math.max(2, Math.round(BRICK.l * o.ppmm));
+		const pxH = Math.max(2, Math.round(BRICK.d * o.ppmm));
+		const iw = pic.img.width, ih = pic.img.height;
+
+		// this brick's square of the picture, in source pixels
+		const src = {
+			x: r.u0 * iw, y: r.v0 * ih,
+			w: Math.max(1, (r.u1 - r.u0) * iw), h: Math.max(1, (r.v1 - r.v0) * ih),
+		};
+		const burn = Img.process(Img.crop(pic.img, src, pxW, pxH), pic.laser);
+
+		// The good and its printing, cut out of the picture where there is
+		// something to cut, and burnt into it where there is not.
+		//
+		// The face itself is the one bed() draws for 'the good and the
+		// printing' — same kicker, same fat title squeezed to the same width,
+		// same rule, source line and mark in the margin — drawn on nothing
+		// instead of on clay and in white instead of ink. Building it out of
+		// bed() rather than beside it is the point: the printed bed and the
+		// burnt one cannot drift apart, because there is only one of them.
+		//
+		// What is done with it has to answer one awkward fact: a knockout is
+		// a hole, and a hole needs something round it. Over a bleached part
+		// of the picture it is perfect — the name stands in bare brick and
+		// nothing reads better. Over a part the head barely touched there is
+		// nothing to make a hole in and the name disappears. Turning the
+		// square over inside the letters instead fixes the dark end and
+		// spoils both others: it comes out glaring on bare brick and, at the
+		// middle of the range, does nothing at all, because inverting a
+		// mid-grey returns a mid-grey.
+		//
+		// So neither, everywhere: the letters cut out as before, and only
+		// where the square is already close to bare do they lift instead —
+		// and lift part of the way, not to full bleach. The two behaviours
+		// are crossfaded over a band, so a brick that is half sky and half
+		// hillside changes hand across itself without a seam.
+		if (o.bedWord !== false) {
+			const type = bed(plate, Object.assign({}, o, {
+				clay: 'rgba(0,0,0,0)',      // no ground: only the letters carry
+				ink: '#ffffff',             // solid inside a stroke, soft at its edge
+				press: null,                // a burnt face is not run through the press
+			}));
+
+			// Which of the two a letter gets is decided by the region it sits
+			// in, never by the pixel under it. Per pixel, a stroke crossing
+			// the changeover would break into salt and pepper; a heavily
+			// reduced copy of the square, blown back up, gives the same
+			// decision a smooth low-frequency shape.
+			const sm = Img.canvas(Math.max(1, pxW >> 4), Math.max(1, pxH >> 4));
+			sm.getContext('2d').drawImage(burn, 0, 0, sm.width, sm.height);
+			const region = Img.canvas(pxW, pxH);
+			region.getContext('2d').drawImage(sm, 0, 0, pxW, pxH);
+
+			const at = o.bedLiftAt == null ? 200 : o.bedLiftAt;   // how bare is bare
+			const band = o.bedLiftBand == null ? 48 : o.bedLiftBand;
+			const lift = o.bedLift == null ? 150 : o.bedLift;     // and how far it lifts
+
+			const bx = burn.getContext('2d');
+			const px = bx.getImageData(0, 0, pxW, pxH);
+			const d = px.data;
+			const m = type.getContext('2d').getImageData(0, 0, pxW, pxH).data;
+			const r = region.getContext('2d').getImageData(0, 0, pxW, pxH).data;
+			for (let i = 0; i < d.length; i += 4) {
+				const a = m[i + 3];
+				if (!a) continue;                      // no letter here
+				const v = d[i];
+				// 0 where the region has plenty of burn to cut into, 1 where
+				// it is bare brick, smooth across the band between
+				let t = (r[i] - (at - band)) / (2 * band);
+				t = t < 0 ? 0 : t > 1 ? 1 : t;
+				t = t * t * (3 - 2 * t);
+				const target = 255 * (1 - t) + Math.max(0, v - lift) * t;
+				const w = a / 255;                     // the type's own soft edge
+				d[i] = d[i + 1] = d[i + 2] = v + (target - v) * w;
+			}
+			bx.putImageData(px, 0, 0);
+		}
+
+		// and the brick under it: the body is the black point, the burn only
+		// ever lifts it. the same rule the brenntisch works to.
+		const body = pic.body || 'sooty';
+		const c = Img.clayTexture(pxW, pxH, (plate.id || '').length * 7 + 3, body);
+		const cx = c.getContext('2d');
+		if (pic.polarity === 'darker') {
+			cx.globalCompositeOperation = 'multiply';
+			cx.drawImage(burn, 0, 0);
+		} else {
+			cx.globalAlpha = Img.SCAR_ALPHA;
+			cx.drawImage(Img.burnLayer(burn), 0, 0);
+		}
+		cx.globalAlpha = 1;
+		cx.globalCompositeOperation = 'source-over';
+		return c;     // deliberately not pressed(): this face is burnt, not printed
+	}
+
 	/* -------------------------------------------------- the name, either end */
 
 	// The place, and nothing else, set as large as the face will take it. On
@@ -698,9 +1058,11 @@
 	// can read the top of and a yard nothing else can stand beside. Past the
 	// ceiling the tail is folded into one line — which is not an invention:
 	// the volumes do exactly this, and call it "Uebrige Einfuhr". The line
-	// carries its own sum, so the stack still adds up to what the place sent;
+	// carries its own sum, so the stack still adds up to what the block held;
 	// the quantity is a dash, because pounds and pieces do not add together.
-	function courses(plate, rowsPerBrick, sides, cap, heads) {
+	// What the folded line is called is the caller's, because it is a tail of
+	// goods in one cut of the volume and a tail of places in the other.
+	function courses(plate, rowsPerBrick, sides, cap, heads, fold) {
 		const n = Math.max(1, rowsPerBrick | 0);
 		const two = sides === 2;
 		const per = two ? n * 2 : n;
@@ -720,8 +1082,9 @@
 		if (rows.length > room) {
 			const rest = rows.slice(room - 1);
 			const known = rest.filter(r => Number.isFinite(r.value));
+			const name = `${fold || 'Uebrige Waaren'} (${rest.length})`;
 			rows = rows.slice(0, room - 1).concat([{
-				article: `Uebrige Waaren (${rest.length})`,
+				article: name, title: name, place: 'folded',
 				qty: null, unit: '', cat: 'folded', merged: 0,
 				value: known.length ? known.reduce((s, r) => s + r.value, 0) : null,
 			}]);
@@ -740,6 +1103,16 @@
 		return out;
 	}
 
+	// The widest figure a stack has to make room for, over every course of it —
+	// the folded tail's sum included, since it is printed like any other.
+	function widest(cs) {
+		let w = null;
+		for (const load of cs)
+			for (const r of load.front.concat(load.back))
+				if (r && Number.isFinite(r.value) && (w === null || r.value > w)) w = r.value;
+		return w;
+	}
+
 	/* ------------------------------------------------------- the whole stack */
 
 	// Every printed side of a stack, in the order it stands: course by course
@@ -752,10 +1125,18 @@
 	// thing on screen and another on the bed of a laser.
 	function faceList(plate, o) {
 		o = opt(o);
-		const cs = courses(plate, o.rows, o.sides, o.maxBricks, o.heads);
+		const ware = plate.axis === 'ware';
+		const cs = courses(plate, o.rows, o.sides, o.maxBricks, o.heads, o.fold);
+		// one column width for the whole stack, so its rule does not wander
+		if (o.valMax == null) o = Object.assign({}, o, { valMax: widest(cs) });
 		const two = o.sides === 2;
-		const oneFace = merged(o);
-		const nameOn = (two && !oneFace) ? 'none' : (o.nameOn || 'none');
+		// cut by good the long face carries both figures already, so there is
+		// no face to be won back by bringing the Werth round; both ends are
+		// spent as soon as a brick prints on both sides
+		const oneFace = !ware && merged(o);
+		const nameOn = (two && (ware || !oneFace)) ? 'none' : (o.nameOn || 'none');
+		const long = ware ? figures : stretcher;
+		const small = ware ? land : header;
 		const out = [];
 
 		const put = (id, tag, kind, w, h, course, letter, make) =>
@@ -767,16 +1148,16 @@
 			const opts = (l, ov) => Object.assign({}, o, top, ov, { tag: tagFor(plate, n, l) });
 
 			put(`c${n}b`, tagFor(plate, n, 'b'), 'stretcher', BRICK.l, BRICK.h, n, 'b',
-				ov => stretcher(load.front, opts('b', ov)));
+				ov => long(load.front, opts('b', ov)));
 			if (!oneFace)
 				put(`c${n}c`, tagFor(plate, n, 'c'), 'header', BRICK.d, BRICK.h, n, 'c',
-					ov => header(load.front, opts('c', ov)));
+					ov => small(load.front, opts('c', ov)));
 			if (two && load.back.length) {
 				put(`c${n}d`, tagFor(plate, n, 'd'), 'stretcher', BRICK.l, BRICK.h, n, 'd',
-					ov => stretcher(load.back, opts('d', ov)));
+					ov => long(load.back, opts('d', ov)));
 				if (!oneFace)
 					put(`c${n}e`, tagFor(plate, n, 'e'), 'header', BRICK.d, BRICK.h, n, 'e',
-						ov => header(load.back, opts('e', ov)));
+						ov => small(load.back, opts('e', ov)));
 			}
 			// the bed comes off the course that carries it, and only that one
 			if (i === 0 && o.bedOn !== 'none')
@@ -798,7 +1179,8 @@
 	}
 
 	S.Faces = {
-		BRICK, DEFAULTS, stretcher, header, bed, bedLayout, nameplate, blank, courses,
+		BRICK, DEFAULTS, stretcher, header, land, figures, bed, bedLayout, nameplate,
+		blank, bedPicture, courses, widest, rowName,
 		sourceLine, shipsOf, shipsLine, tagFor, initials, namesFor, faceList,
 	};
 })(window);

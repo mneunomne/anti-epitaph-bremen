@@ -1,14 +1,15 @@
 /* scene.js — the yard, and the stacks standing in it.
  *
- * One brick a course, 200 long by 100 deep by 50 high, stacked square with
- * no bond offset — a pallet stack, not a wall. The goods run down the
- * stretcher face and their values down the header face beside them, three
- * to a course, so the height of a stack is the number of goods the place
- * sent and nothing else.
+ * One brick a course, 196 long by 95 deep by 45 high, stacked square with
+ * no bond offset — a pallet stack, not a wall. A stack is one good, and the
+ * places that sent it run down the two faces that meet at the near arris:
+ * the names down the small one, their quantities and values down the long
+ * one, three to a course. So the height of a stack is the number of places
+ * a good came from and nothing else.
  *
  * Any number of them can stand in the yard at once, set out on a field with
  * the gaps under control. Seen from straight above through the flat camera
- * that is a sheet of beds, one to a place, and the whole comparison is the
+ * that is a sheet of beds, one to a good, and the whole comparison is the
  * plan: how far each stack runs, and how many there are.
  *
  * Orbit is written out by hand rather than pulling a loose OrbitControls
@@ -222,12 +223,16 @@
 		bytes = 0; count = 0;
 	}
 
-	// a stack of one place, its foot at y = 0, centred on its own origin
+	// a stack of one good, its foot at y = 0, centred on its own origin
 	function stack(plate, o) {
 		const g = new THREE.Group();
 		const rows = Math.max(1, o.rows | 0);
 		const two = o.sides === 2;
-		const cs = F.courses(plate, rows, o.sides, o.maxBricks, o.heads);
+		const cs = F.courses(plate, rows, o.sides, o.maxBricks, o.heads, o.fold);
+		// the Werth column is measured over the whole stack, not over the three
+		// figures a brick happens to carry, so the rule before it runs straight
+		// down the courses instead of jogging at every joint
+		if (o.valMax == null) o = Object.assign({}, o, { valMax: F.widest(cs) });
 		const gap = o.gap || 0;
 		const h = B.h + gap;
 		const foot = o.pallet ? PAL.h : 0;      // the deck the first course sits on
@@ -235,12 +240,10 @@
 
 		// the name is the same on every brick of a stack, so it is drawn once
 		// and the one material hung on all of them — a stack of thirty courses
-		// costs one nameplate, not thirty
-		// printing on both sides takes the two faces the name would have gone on
-		// — unless the values have gone round onto the stretcher with their
-		// goods, which gives both ends back
-		const oneFace = o.figuresOn === 'stretcher';
-		const nameOn = (two && !oneFace) ? 'none' : (o.nameOn || 'none');
+		// costs one nameplate, not thirty. Printing on both sides takes the
+		// two faces the name would have gone on: they carry the next places
+		// instead.
+		const nameOn = two ? 'none' : (o.nameOn || 'none');
 		const endName = (nameOn === 'end' || nameOn === 'both')
 			? mat(F.nameplate(plate, B.d, B.h, Object.assign({}, o, { tag: F.tagFor(plate, '', 'e') }))) : null;
 		const backName = (nameOn === 'back' || nameOn === 'both')
@@ -252,30 +255,31 @@
 			const y = foot * MM + (cs.length - 1 - i) * h * MM + B.h * MM / 2;
 
 			// BoxGeometry hands its materials out in the order
-			// [ +X, -X, +Y, -Y, +Z, -Z ] — right, left, top, bottom, front,
-			// back. With the brick 200 wide, 50 high and 100 deep that puts
-			// the header on +X, the bed on +Y and the stretcher on +Z.
-			// A brick shows a stretcher and a header to the front-right corner
-			// and another pair to the back-left one. With `sides` at two the
-			// second pair carries the next goods rather than nothing, and the
-			// stack comes out half as high for the same reading.
+			// [ +X, -X, +Y, -Y, +Z, -Z ] — and of those, the pair a yard shows
+			// at once is -X and +Z: the small face on the left of the near
+			// arris, the long face on its right. So the names go on -X and the
+			// figures on +Z, and a row reads across the edge in the direction
+			// it is read in anyway. The other pair, +X and -Z, stands round
+			// the back on exactly the same terms; with `sides` at two it
+			// carries the next places rather than nothing, and the stack comes
+			// out half as high for the same reading.
 			const faces = o.everyFace !== false;
 			const back = two && load.back.length;
 			// a stack is one table and has one head — the top course carries it
 			const base = load.head ? o : Object.assign({}, o, { top: false });
 			// and every printed side carries its own mark: the brick counting
-			// down from the top, and b c d e round the four sides from the
-			// stretcher in view. The bed is a, and is obviously itself.
+			// down from the top, and b c d e round the four sides from the long
+			// face in view. The bed is a, and is obviously itself.
 			const fo = l => Object.assign({}, base, { tag: F.tagFor(plate, i + 1, l) });
-			// with the values on the stretcher the header carries nothing, and
-			// the one shared blank does for every brick in the yard
 			const mats = [
-				faces && !oneFace ? mat(F.header(load.front, fo('c'))) : blank(B.d, B.h, o),
-				back && faces && !oneFace ? mat(F.header(load.back, fo('e'))) : (endName || blank(B.d, B.h, o)),
-				top && o.bedOn !== 'none' ? mat(F.bed(plate, o)) : blank(B.l, B.d, o),
+				back && faces ? mat(F.land(load.back, fo('e'))) : (endName || blank(B.d, B.h, o)),
+				faces ? mat(F.land(load.front, fo('c'))) : blank(B.d, B.h, o),
+				top && o.bedOn !== 'none'
+					? mat((o.bedOn === 'picture' && F.bedPicture(plate, o)) || F.bed(plate, o))
+					: blank(B.l, B.d, o),
 				blank(B.l, B.d, o),
-				faces ? mat(F.stretcher(load.front, fo('b'))) : blank(B.l, B.h, o),
-				back && faces ? mat(F.stretcher(load.back, fo('d'))) : (backName || blank(B.l, B.h, o)),
+				faces ? mat(F.figures(load.front, fo('b'))) : blank(B.l, B.h, o),
+				back && faces ? mat(F.figures(load.back, fo('d'))) : (backName || blank(B.l, B.h, o)),
 			];
 
 			const brick = new THREE.Mesh(geo.clone(), mats);
@@ -285,24 +289,24 @@
 			if (o.outline !== false) {
 				const line = new THREE.LineSegments(
 					new THREE.EdgesGeometry(brick.geometry),
-					new THREE.LineBasicMaterial({ color: o.ink || '#12100e' })
+					new THREE.LineBasicMaterial({ color: o.outlineColour || '#33190f' })
 				);
 				line.position.copy(brick.position);
 				g.add(line);
 			}
 		}
-		g.userData.id = plate.id;          // so where a place stands can be read back
+		g.userData.id = plate.id;          // so where a good stands can be read back
 		g.userData.courses = cs.length;
 		g.userData.height = foot + cs.length * B.h + (cs.length - 1) * gap;
 		return g;
 	}
 
-	// A stack is one way of standing a place up and not the only one. Here the
-	// height is the count of goods; on das Feld every place gets the same one
-	// or two bricks and carries only its largest goods, so the field says how
-	// many places there were and nothing about how much each sent. The yard,
-	// the ground, the camera and the layout are the same either way, so the
-	// brick-builder is the single thing that swaps out.
+	// A stack is one way of standing a block up and not the only one. Here the
+	// height is the count of places a good came from; on das Feld every place
+	// gets the same one or two bricks and carries only its largest goods, so
+	// the field says how many places there were and nothing about how much
+	// each sent. The yard, the ground, the camera and the layout are the same
+	// either way, so the brick-builder is the single thing that swaps out.
 	let builder = stack;
 	const KIT = { MM, B, PAL, mat, blank };
 	const setBuilder = fn => { builder = fn || stack; };
@@ -313,15 +317,29 @@
 		return () => { s ^= s << 13; s >>>= 0; s ^= s >> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
 	}
 
-	// the field: as many columns as asked for, the gaps between the bricks
-	// themselves rather than between their centres, so a gap of 0 means the
-	// stacks touch
+	// The field: a fixed grid of standing-places, only some of which are used.
+	//
+	// The yard is the wall seen from above. The engraving desk lays a picture
+	// across six bricks by eight courses, and this stands its stacks at those
+	// same forty-eight points — so a top brick here carries exactly the square
+	// of the picture that a brick in that position of the wall would carry.
+	//
+	// There are almost never forty-eight goods, and the ones left over are the
+	// point rather than a shortfall: the empty places are dealt in among the
+	// full ones off the field's own seed, so a stack stands clear with gaps
+	// round it instead of walled in by its neighbours, and the picture on the
+	// tops comes through as fragments of something whole. Which places are
+	// empty is decided by the seed alone; which stack lands on which of the
+	// full ones is decided back to front, so the tall ones are at the back.
 	function build(plates, o) {
 		clear();
-		const L = Object.assign({ cols: 4, gapX: 120, gapZ: 120, stagger: 0, jitter: 0, turn: 0, seed: 7 }, o.layout);
+		const L = Object.assign({ cols: 6, rows: 8, gapX: 120, gapZ: 120, stagger: 0, jitter: 0, turn: 0, seed: 7 }, o.layout);
 		const cols = Math.max(1, Math.min(12, L.cols | 0));
 		const n = plates.length;
-		const rowsOf = Math.ceil(n / cols) || 1;
+		// the grid is as deep as it is asked to be, and deeper if there are
+		// more goods standing than forty-eight places to put them
+		const rowsOf = Math.max(1, Math.min(40, Math.max(L.rows | 0, Math.ceil(n / cols))));
+		const cells = cols * rowsOf;
 		const fw = B.l, fd = B.d;
 		const cellW = fw + L.gapX;
 		const cellD = fd + L.gapZ;
@@ -330,29 +348,54 @@
 		// one brick to a course, so the courses laid across the whole yard are
 		// the bricks that would have to be carried to it
 		let maxH = 0, courses = 0, tallest = 0;
-		let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
 
-		// A row is centred on what actually stands in it, not on how wide the
-		// field was asked to be. One stack under a four-column setting is one
-		// stack in the middle of the yard, not a stack in the first of four
-		// columns with three empty ones beside it and the camera looking at
-		// the gap; the same goes for whatever is left over on the last row.
-		const inRow = row => Math.max(1, Math.min(cols, n - row * cols));
+		// Which of the places are stood on. Every place is a candidate, the
+		// whole grid is dealt off the seed, and the first n are taken — so the
+		// empties fall anywhere, back row included, rather than collecting at
+		// the front where filling in order would leave them.
+		const deck = Array.from({ length: cells }, (_, i) => i);
+		for (let i = deck.length - 1; i > 0; i--) {
+			const j = Math.floor(rand() * (i + 1));
+			[deck[i], deck[j]] = [deck[j], deck[i]];
+		}
+		// back to front, so the plates — which arrive tallest first — come
+		// down on the far places before the near ones
+		const used = deck.slice(0, Math.min(n, cells)).sort((a, b) => a - b);
 
-		for (let i = 0; i < n; i++) {
-			const col = i % cols, row = (i / cols) | 0;
-			const g = builder(plates[i], o, KIT);
-
-			// odd rows shove over by a share of a cell, which is what breaks
-			// the grid into the scatter the drawing has
+		const at = cell => {
+			const col = cell % cols, row = (cell / cols) | 0;
 			const off = (row % 2) ? cellW * (L.stagger / 100) : 0;
-			const jx = L.jitter ? (rand() * 2 - 1) * L.jitter : 0;
-			const jz = L.jitter ? (rand() * 2 - 1) * L.jitter : 0;
+			return {
+				x: (col - (cols - 1) / 2) * cellW + off + (L.jitter ? (rand() * 2 - 1) * L.jitter : 0),
+				z: (row - (rowsOf - 1) / 2) * cellD + (L.jitter ? (rand() * 2 - 1) * L.jitter : 0),
+				turn: L.turn ? (rand() * 2 - 1) * L.turn * Math.PI / 180 : 0,
+			};
+		};
+		const spots = used.map(at);
 
-			const x = (col - (inRow(row) - 1) / 2) * cellW + off + jx;
-			const z = (row - (rowsOf - 1) / 2) * cellD + jz;
+		// The picture is stretched over the whole grid, standing places and
+		// empty ones alike — never over just what happens to be standing. A
+		// square has to belong to the position, so that taking a stack away
+		// leaves a hole in the picture instead of quietly resizing it onto
+		// everything left.
+		const spanX = (cols - 1) * cellW + fw;
+		const spanZ = (rowsOf - 1) * cellD + fd;
+		const gridMinX = -spanX / 2, gridMinZ = -spanZ / 2;
+		const rectAt = spot => ({
+			u0: (spot.x - fw / 2 - gridMinX) / spanX, u1: (spot.x + fw / 2 - gridMinX) / spanX,
+			v0: (spot.z - fd / 2 - gridMinZ) / spanZ, v1: (spot.z + fd / 2 - gridMinZ) / spanZ,
+		});
+
+		let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+		for (let i = 0; i < spots.length; i++) {
+			const { x, z, turn } = spots[i];
+			const so = o.bedOn === 'picture' && o.picture
+				? Object.assign({}, o, { bedRect: rectAt(spots[i]) })
+				: o;
+			const g = builder(plates[i], so, KIT);
+
 			g.position.set(x * MM, 0, z * MM);
-			if (L.turn) g.rotation.y = (rand() * 2 - 1) * L.turn * Math.PI / 180;
+			if (turn) g.rotation.y = turn;
 
 			group.add(g);
 			maxH = Math.max(maxH, g.userData.height);

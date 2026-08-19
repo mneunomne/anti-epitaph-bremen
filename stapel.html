@@ -6,7 +6,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>der Stapel — anti-epigraph</title>
 	<link rel="icon"
-		href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%231c1a18'/><rect x='2' y='3' width='12' height='3' fill='%23d98741'/><rect x='2' y='7' width='12' height='3' fill='%23d98741'/><rect x='2' y='11' width='12' height='3' fill='%23d98741'/></svg>">
+		href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%231c1a18'/><rect x='2' y='3' width='12' height='3' fill='%235e3321'/><rect x='2' y='7' width='12' height='3' fill='%235e3321'/><rect x='2' y='11' width='12' height='3' fill='%235e3321'/></svg>">
 	<link rel="stylesheet" href="css/dashboard.css">
 	<link rel="stylesheet" href="css/tafeln.css">
 	<link rel="stylesheet" href="css/stapel.css">
@@ -38,18 +38,18 @@
 		<!-- ---------------- the places ---------------- -->
 		<aside class="col controls">
 			<section>
-				<h2>the place</h2>
+				<h2>the good</h2>
 				<label class="check"><input type="checkbox" id="many"> stand several in the yard</label>
 				<div class="stepper" id="oneOnly">
 					<button id="prev" title="the one above">↑</button>
 					<button id="next" title="the one below">↓</button>
-					<span class="hint">goods · courses</span>
+					<span class="hint">places · courses</span>
 				</div>
 				<div id="manyPick" class="pair" hidden>
 					<label>take the top <input type="number" id="pickN" min="1" max="40" step="1" value="8"></label>
 					<label>&nbsp;<button id="pickTop" class="wide">stand them up</button></label>
 				</div>
-				<label>search <input type="search" id="placeSearch" placeholder="Brasilien, Cuba, …"></label>
+				<label>search <input type="search" id="placeSearch" placeholder="Caffee, Baumwolle, …"></label>
 				<span class="hint" id="chosenCount"></span>
 				<div class="picker" id="picker"></div>
 			</section>
@@ -79,7 +79,7 @@
 		<aside class="col side">
 			<section>
 				<h2>the stack — <span id="placeName">—</span></h2>
-				<label>goods to a course <input type="range" id="rows" min="1" max="8" step="1">
+				<label>places to a course <input type="range" id="rows" min="1" max="8" step="1">
 					<output id="rowsV">3</output>
 				</label>
 				<label>the joint <input type="range" id="gap" min="0" max="12" step="0.5">
@@ -92,20 +92,27 @@
 				<label>at most <input type="range" id="maxBricks" min="0" max="40" step="1">
 					<output id="maxBricksV">12 bricks</output>
 				</label>
-				<label>the goods are printed
+				<label>the places are printed
 					<select id="sides">
-						<option value="1">on the front only</option>
-						<option value="2">on both sides — half the bricks</option>
+						<option value="1">on the near corner only</option>
+						<option value="2">on both corners — half the bricks</option>
 					</select>
 				</label>
 				<label>the top course carries
 					<select id="bedOn">
-						<option value="full">the place and the printing</option>
-						<option value="source">the printing alone, without the place</option>
 						<option value="none">nothing</option>
+						<option value="full">the good and the printing</option>
+						<option value="source">the printing alone, without the good</option>
+						<option value="picture">the engraving — one picture over all the tops</option>
 					</select>
 				</label>
-				<label id="nameRow">the place's name also
+				<div id="pictureRow" hidden>
+					<label>the picture comes from
+						<select id="pictureProject"></select>
+					</label>
+					<p class="hint" id="pictureHint">—</p>
+				</div>
+				<label id="nameRow">the good's name also
 					<select id="nameOn">
 						<option value="none">nowhere else</option>
 						<option value="end">on the far end</option>
@@ -113,10 +120,11 @@
 						<option value="both">on both</option>
 					</select>
 				</label>
-				<p class="hint">the brick is 196 × 95 × 45 and never changes. Three goods fit across a
-					stretcher, so a stack stands as high as the place had goods to send — that is the
-					whole of what the height means. With <i>print every face</i> off only the beds are
-					drawn, which is all the plan shows and a great deal less to hold.</p>
+				<p class="hint">the brick is 196 × 95 × 45 and never changes. Three places fit down a
+					course, so a stack stands as high as the number of places that sent the good — that
+					is the whole of what the height means, and it is a different height from the one
+					this yard used to show. With <i>print every face</i> off only the beds are drawn,
+					which is all the plan shows and a great deal less to hold.</p>
 			</section>
 
 			<section id="manyOnly" hidden>
@@ -126,12 +134,16 @@
 				</div>
 				<label>they stand
 					<select id="order">
+						<option value="tallest">tallest at the back</option>
 						<option value="werth">biggest Werth first</option>
-						<option value="goods">most goods first</option>
+						<option value="places">most places first</option>
 						<option value="name">by name</option>
 						<option value="picked">as they were picked</option>
 						<option value="shuffle">shuffled</option>
 					</select>
+				</label>
+				<label>rows deep <input type="range" id="gridRows" min="1" max="20" step="1">
+					<output id="gridRowsV"></output>
 				</label>
 				<label>stacks to a row <input type="range" id="cols" min="1" max="12" step="1">
 					<output id="colsV">4</output>
@@ -151,6 +163,12 @@
 				<label>turned <input type="range" id="turn" min="0" max="20" step="0.5">
 					<output id="turnV">0°</output>
 				</label>
+				<label>the deal <input type="range" id="seed" min="1" max="200" step="1">
+					<output id="seedV"></output>
+				</label>
+				<p class="hint">the deal settles which places in the grid stay empty, and shuffles
+					the goods a little within the order they stand in. <em>shuffle</em> throws it at
+					random; the slider walks it one deal at a time.</p>
 				<div class="laid-list" id="chosenList"></div>
 				<button id="clearPicked" class="wide">back to one</button>
 			</section>
@@ -166,12 +184,14 @@
 					place's total — no single good is tagged with its class anywhere in the source.
 					These are read off the names of the goods, which places about nine in ten of them.
 					The rest fall to <i>nicht zugeordnet</i>, shown by default so nothing quietly
-					vanishes from a stack.</p>
+					vanishes. A class belongs to a good and to none of its lines, so here it takes whole
+					stacks out of the yard rather than thinning the ones standing in it — the figure
+					beside each is how many goods it holds.</p>
 			</section>
 
 			<section>
 				<div class="panel-head">
-					<h2>the goods</h2>
+					<h2>the places</h2>
 					<button id="clearStruck">put all back</button>
 				</div>
 				<label>hide anything under <input type="range" id="minValue" min="0" max="10" step="1">
@@ -180,12 +200,12 @@
 				<p class="hint" id="share">—</p>
 				<div id="excluded" class="laid-list"></div>
 				<span class="hint" id="excludedCount"></span>
-				<label>search <input type="search" id="goodSearch" placeholder="Baumwolle, Caffee, …"></label>
+				<label>search <input type="search" id="goodSearch" placeholder="Brasilien, Cuba, …"></label>
 				<div id="goodsList" class="laid-list tall"></div>
-				<p class="hint">Everything standing in the yard, biggest Werth first. Striking one out
-					takes it from every table, not only this one — the long tail is what makes a stack
-					unwieldy, and a floor cuts it without having to choose by hand. A good the page never
-					valued is not small, only unknown, so a dash is never cut by the floor.</p>
+				<p class="hint">Every place standing in the yard, biggest Werth first. Striking one out
+					takes it from every stack, not only this one — the long tail is what makes a stack
+					unwieldy, and a floor cuts it without having to choose by hand. A place the page
+					never valued is not small, only unknown, so a dash is never cut by the floor.</p>
 			</section>
 
 			<section>
@@ -201,7 +221,7 @@
 				<label>texture <input type="range" id="ppmm" min="3" max="16" step="1">
 					<output id="ppmmV">8 px/mm</output>
 				</label>
-				<label>the place on the end <input type="range" id="nameSize" min="6" max="39" step="0.5">
+				<label>the good on the end <input type="range" id="nameSize" min="6" max="39" step="0.5">
 					<output id="nameSizeV">23 mm</output>
 				</label>
 				<div class="panel-head">
@@ -222,10 +242,13 @@
 					<button id="resetBed" title="back to the setting der Deckel arrived at">reset</button>
 				</div>
 				<p class="hint">The one face that is not a column of figures, so it carries what belongs
-					to the whole stack and to nothing narrower: whose trade it is, and off which printing
-					it was read. The sum and the ships were tried on it and taken off — a Werth belongs
-					with the figures on the working faces, not over them. Worked out on
-					<a href="deckel.html">der Deckel →</a>, which sets this same face on its own.</p>
+					to the whole stack and to nothing narrower: which good it is, and off which printing
+					it was read. It is set to carry <b>nothing</b> for now — a stack cut by good has not
+					settled what its top should say, and a blank one says nothing untrue. The sum and the
+					ships were tried on it and taken off long before that: a Werth belongs with the
+					figures on the working faces, not over them. Worked out on
+					<a href="deckel.html">der Deckel →</a>, which sets this same face on its own, and
+					still sets it for a place.</p>
 				<div id="p_bed"></div>
 			</section>
 
@@ -244,10 +267,10 @@
 				</label>
 				<p class="hint" id="exSize">—</p>
 				<button id="exportFaces" class="wide primary">export the faces</button>
-				<p class="hint">One png a printed side, at the size the brick actually is: a stretcher
-					is 196 × 45 mm, a header 95 × 45, the bed 196 × 95. The top comes off with the
+				<p class="hint">One png a printed side, at the size the brick actually is: a long face
+					is 196 × 45 mm, a small one 95 × 45, the bed 196 × 95. The top comes off with the
 					course that carries it — one to a stack, since every other bed in a yard is under a
-					brick — and it is set even where the yard is standing with a bare one. The place's
+					brick — and it is set even where the yard is standing with a bare one. The good's
 					name is one drawing hung on every course, so it comes off once and not once a
 					course; a face with nothing on it is not written at all.</p>
 				<p class="hint">They arrive as separate downloads — a browser will ask once whether it
@@ -256,23 +279,29 @@
 
 			<section>
 				<h2>what is on which face</h2>
-				<p class="hint"><b>the stretcher</b>, 196 × 45 — the good, run out on leader dots to its
-					quantity and measure.<br><b>the header</b>, 95 × 45 — the value of those same three
-					goods, flush right, on the same three lines.<br><b>the bed</b>, 196 × 95 — only the
-					topmost course carries it: the place, which printing it was read off, and the sum.<br>
-					<b>the far end</b>, 95 × 45, and <b>the back</b>, 196 × 45 — bare unless the place's
-					name is put on them, and then it repeats down every course of the stack, the way a
-					title repeats down the spines of a run of volumes.</p>
-				<p class="hint">With the <b>Werth beside its quantity</b> the header is emptied and the
-					stretcher carries the whole reading — good, quantity, measure and value on the one
-					face, which is the only way a stack says what a good was worth to anyone standing
-					still. The name column pays for it: it gives up exactly what the Werth column takes,
-					and a long name is clipped sooner. Emptied, the header is free for the place's name,
-					even with both sides printed.</p>
-				<p class="hint">Printed on <b>both sides</b> those two bare faces carry the next three
-					goods and their values instead, so a brick holds six and the stack comes out half as
-					high. Nothing is lost but the standing still: no one in front of it sees more than
-					half of what the place sent, and the name has nowhere left to go.</p>
+				<p class="hint">A row is one line bent round a corner. It begins on <b>the small
+					face</b>, 95 × 45 — the place, flush left, run out on leader dots to the arris — and
+					finishes on <b>the long face</b>, 196 × 45, where the dots pick up again and carry
+					the eye to the quantity in its own measure and then to the Werth, flush right. Of a
+					brick's four upright faces those are the two that meet at the near edge, the small
+					one on the left and the long one on the right, so the whole reading stands in front
+					of anyone who does not move.</p>
+				<p class="hint">Both figures are on the one face on purpose. A quantity and a value are
+					the two halves of one statement — 800,677 Ld'or means nothing without the pounds it
+					was paid for — and nothing is served by making someone walk round a stack to put
+					them together. It costs the place's name the room the figures take, so a long name
+					is clipped rather than allowed to reach the arris: the dots have to start somewhere
+					or the line does not read as a line.</p>
+				<p class="hint"><b>the bed</b>, 196 × 95 — only the topmost course carries it, and here
+					it carries nothing.<br><b>the far end</b>, 95 × 45, and <b>the back</b>, 196 × 45 —
+					the same pair again, round the other corner, bare unless the good's name is put on
+					them; then it repeats down every course of the stack, the way a title repeats down
+					the spines of a run of volumes.</p>
+				<p class="hint">Printed on <b>both corners</b> that far pair carries the next three
+					places instead — the small face their names, the long face their figures, read the
+					same way round the same kind of edge — so a brick holds six and the stack comes out
+					half as high. Nothing is lost but the standing still: no one in front of it sees more
+					than half of who sent the good, and the name has nowhere left to go.</p>
 			</section>
 
 			<section>
@@ -285,6 +314,8 @@
 	<div id="toast" class="toast"></div>
 
 	<script src="js/lib/three.min.js"></script>
+	<script src="js/lib/idb.js"></script>
+	<script src="js/engrave/imaging.js"></script>
 	<script src="data/handel-all.js"></script>
 	<script src="js/tafeln/model.js"></script>
 	<script src="js/tafeln/plate.js"></script>

@@ -34,7 +34,7 @@
 		// overrides on faces.js and nothing more, so that a decision taken
 		// there arrives here without being copied
 		face: {},
-		clay: '#d98741', ink: '#12100e',
+		clay: '#5e3321', ink: '#d2c3b9',
 		ppmm: 6,
 		layout: { cols: 6, gapX: 60, gapZ: 60, stagger: 0, jitter: 0, turn: 0, seed: 7 },
 		// overrides on ink.js, the same way the faces are overrides on faces.js
@@ -444,6 +444,11 @@
 
 		try {
 			const kept = JSON.parse(localStorage.getItem(KEY));
+			// a view saved before the stock was darkened carries the old
+			// bright terracotta and its black ink, and a stored value beats
+			// a default — so the two nobody chose are dropped
+			if (kept && kept.clay === '#d98741') delete kept.clay;
+			if (kept && kept.ink === '#12100e') delete kept.ink;
 			if (kept) {
 				Object.assign(S, kept);
 				S.layout = Object.assign({}, LAYOUT, kept.layout);
