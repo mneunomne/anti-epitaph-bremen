@@ -44,6 +44,7 @@
 		sides: 1, bedOn: 'none', pallet: false, order: 'tallest',
 		faceVary: 'brick',      // a face per brick, per stack, or one throughout
 		pictureProject: '',     // which brenntisch project lends the tops their picture
+		hoPpmm: 12,             // px/mm the faces are handed over at
 		maxBricks: 12,          // 0 stands for as many places as the good had
 		nameSize: 23,
 		// Overrides on faces.js, nothing more. What is not here is whatever
@@ -58,6 +59,7 @@
 	};
 
 	const { WARE, BED, WEIGHTS } = AE.Stapel.Panel;
+	const Handoff = AE.Stapel.Handoff;
 
 	/* ------------------------------------------------- the engraved tops */
 
@@ -545,6 +547,40 @@
 			picker(); redo(true);
 		};
 		$('faceVary').onchange = e => { S.faceVary = e.target.value; redo(false); };
+		$('hoPpmm').oninput = e => {
+			S.hoPpmm = num(e.target.value, 12);
+			$('hoPpmmV').value = S.hoPpmm + ' px/mm'; save();
+		};
+		$('exportFaces').onclick = async () => {
+			const ps = ordered();
+			if (!ps.length) return toast('nothing is standing');
+			const btn = $('exportFaces'); btn.disabled = true;
+			try {
+				// the squares of the picture belong to where a stack stands, so
+				// they are read back off the yard rather than worked out again
+				const rects = {};
+				if (S.bedOn === 'picture' && picture) {
+					for (const q of Scene.placement()) {
+                        const p = ps.find(x => x.id === q.id);
+                        if (p && q.bedRect) rects[Faces.tagFor(p, 1, 'a')] = q.bedRect;
+					}
+				}
+				const { zip, manifest } = await Handoff.build(ps, faceOpts(), {
+					ppmm: S.hoPpmm, year: S.year, seed: S.layout.seed,
+					picture: S.bedOn === 'picture' ? picture : null,
+					bedRects: rects, now: new Date().toISOString(),
+				}, (i, n, tag) => { btn.textContent = 'cutting ' + (i + 1) + '/' + n + '  ' + tag; });
+				const url = URL.createObjectURL(zip.blob());
+				const a = document.createElement('a');
+				a.href = url; a.download = 'faces-' + S.year + '.zip'; a.click();
+				setTimeout(() => URL.revokeObjectURL(url), 4000);
+				toast(manifest.faces.length + ' faces at ' + manifest.ppmm + ' px/mm');
+			} catch (err) {
+				toast('export failed: ' + err.message);
+			} finally {
+				btn.disabled = false; btn.textContent = 'export the faces for der Brenner';
+			}
+		};
 		$('bedOn').onchange = async e => {
 			S.bedOn = e.target.value;
 			sync();
@@ -662,6 +698,7 @@
 		$('maxBricksV').value = S.maxBricks ? S.maxBricks + ' bricks' : 'as many as it takes';
 		$('bedOn').value = S.bedOn;
 		$('faceVary').value = S.faceVary;
+		$('hoPpmm').value = S.hoPpmm; $('hoPpmmV').value = S.hoPpmm + ' px/mm';
 		$('pictureRow').hidden = S.bedOn !== 'picture';
 		$('pallet').checked = S.pallet;
 		$('order').value = S.order;

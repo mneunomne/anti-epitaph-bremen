@@ -29,6 +29,9 @@
 		<div class="grow"></div>
 
 		<span class="hint" id="jobLine">—</span>
+		<button id="takeFaces">take faces from a file</button>
+		<button id="dropFaces" hidden>back to the volume</button>
+		<input type="file" id="facesFile" multiple accept=".json,.png" hidden>
 		<button id="exportSheet">this sheet</button>
 		<button id="exportAll" class="primary">every sheet — .gc</button>
 	</header>
@@ -191,6 +194,8 @@
 	<script src="js/tafeln/ink.js"></script>
 	<script src="js/stapel/faces.js"></script>
 	<script src="js/stapel/panel.js"></script>
+	<script src="js/lib/zip.js"></script>
+	<script src="js/stapel/handoff.js"></script>
 	<script src="js/brenner/nest.js"></script>
 	<script src="js/engrave/gcode.js"></script>
 	<script src="js/brenner/ui.js"></script>

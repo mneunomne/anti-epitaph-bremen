@@ -402,10 +402,12 @@
 		let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
 		for (let i = 0; i < spots.length; i++) {
 			const { x, z, turn } = spots[i];
-			const so = o.bedOn === 'picture' && o.picture
-				? Object.assign({}, o, { bedRect: rectAt(spots[i]) })
-				: o;
+			const rect = (o.bedOn === 'picture' && o.picture) ? rectAt(spots[i]) : null;
+			const so = rect ? Object.assign({}, o, { bedRect: rect }) : o;
 			const g = builder(plates[i], so, KIT);
+			// kept on the group so the handoff can read back which square of the
+			// picture this stack's top actually carried
+			g.userData.bedRect = rect;
 
 			g.position.set(x * MM, 0, z * MM);
 			if (turn) g.rotation.y = turn;
@@ -492,7 +494,8 @@
 	function placement() {
 		return group.children
 			.filter(c => c.userData && c.userData.id)
-			.map(c => ({ id: c.userData.id, x: c.position.x / MM, z: c.position.z / MM }))
+			.map(c => ({ id: c.userData.id, x: c.position.x / MM, z: c.position.z / MM,
+						 bedRect: c.userData.bedRect || null }))
 			.sort((a, b) => a.z - b.z || a.x - b.x);
 	}
 

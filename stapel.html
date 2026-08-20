@@ -114,7 +114,15 @@
 					</select>
 				</label>
 				<div id="pictureRow" hidden>
-					<label>the picture comes from
+					<label>hand to der Brenner at <input type="range" id="hoPpmm" min="4" max="24" step="1">
+					<output id="hoPpmmV"></output>
+				</label>
+				<button id="exportFaces" class="wide">export the faces for der Brenner</button>
+				<p class="hint" id="hoHint">one png per face, black on white, with a manifest
+					saying which face of which brick each one is. der Brenner needs nothing
+					else — it never reads the volume. the burn cannot come out finer than
+					the resolution written here.</p>
+				<label>the picture comes from
 						<select id="pictureProject"></select>
 					</label>
 					<p class="hint" id="pictureHint">—</p>
@@ -328,6 +336,8 @@
 	<script src="js/tafeln/plate.js"></script>
 	<script src="js/tafeln/ink.js"></script>
 	<script src="js/stapel/faces.js"></script>
+	<script src="js/lib/zip.js"></script>
+	<script src="js/stapel/handoff.js"></script>
 	<script src="js/stapel/panel.js"></script>
 	<script src="js/stapel/scene.js"></script>
 	<script src="js/stapel/ui.js"></script>

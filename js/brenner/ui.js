@@ -57,6 +57,15 @@
 
 	// a face is known by its volume, its place and its mark, so the register
 	// survives a change of setting that renumbers nothing
+	// A set of faces handed over by der Stapel.
+	//
+	// When one is loaded the volume is not consulted at all: these are finished
+	// pictures with a size in millimetres and a note of which face of which
+	// brick they are, and that is the whole of what this page needs. It packs
+	// them and burns them. It does not know, and must not need to know, what
+	// they say.
+	let taken = null;      // { manifest, items: [{img, tag, brick, w_mm, ...}] }
+
 	const keyOf = (p, f) => `${S.year}/${p.id}/${f.tag}`;
 
 	// The faces are cut on white in black, whatever the yard is coloured: the
@@ -93,6 +102,10 @@
 
 	// everything picked, in the order the places were picked and the faces stand
 	function chosen() {
+		if (taken) {
+			// everything that came in the file, in the order the manifest lists
+			return taken.items.map(it => ({ taken: it, key: 'taken/' + it.tag }));
+		}
 		const out = [];
 		for (const id of S.places) {
 			const p = data.get(id);
@@ -108,12 +121,16 @@
 	/* ---------------------------------------------------------- the layout */
 
 	function relay() {
-		const items = chosen().map(c => ({
+		const items = chosen().map(c => c.taken ? {
+			w: c.taken.w_mm, h: c.taken.h_mm, tag: c.taken.tag, kind: c.taken.kind,
+			letter: c.taken.letter, tall: c.taken.stands_mm,
+			key: c.key, taken: c.taken, brick: c.taken.brick,
+		} : {
 			w: c.face.w, h: c.face.h, tag: c.face.tag, kind: c.face.kind,
 			letter: c.face.letter, tall: tallOf(c.face),
 			key: c.key, plate: c.plate, face: c.face,
 			brick: brickOf(c.plate, c.face),
-		}));
+		});
 		const packed = Nest.nest(items, Object.assign({}, S.bed, { arrange: S.arrange }));
 		sheets = packed.sheets;
 		if (at >= sheets.length) at = Math.max(0, sheets.length - 1);
@@ -170,7 +187,8 @@
 		for (const it of sheet.items) {
 			// the bed's origin is at the bottom left, the canvas's at the top
 			const yTop = B.bedH - it.y - it.h;
-			const canvas = it.face.make({ ppmm: 4, clay: '#ffffff', ink: '#000000', press: press() });
+			const canvas = it.taken ? it.taken.img
+				: it.face.make({ ppmm: 4, clay: '#ffffff', ink: '#000000', press: press() });
 			x.save();
 			x.translate(P(it.x), P(yTop));
 			if (it.rot) { x.translate(P(it.w), 0); x.rotate(Math.PI / 2); }
@@ -274,6 +292,28 @@
 
 	function faceRows() {
 		const html = [];
+		if (taken) {
+			// the file is the selection; the list is only so you can see what
+			// came in and hold one back
+			let brick = null;
+			for (const it of taken.items) {
+				if (it.brick !== brick) {
+					brick = it.brick;
+					html.push(`<div class="f-place">${esc(it.good || it.brick)}` +
+						`<span>${esc(it.brick)}</span></div>`);
+				}
+				const k = 'taken/' + it.tag;
+				const done = !!S.done[k];
+				if (done && S.hideDone) continue;
+				html.push(`<label class="f-row ${done ? 'done' : ''}">` +
+					`<input type="checkbox" data-face="${esc(k)}"${S.pick[k] ? ' checked' : ''}>` +
+					`<span>${esc(it.tag)}</span>` +
+					`<span class="dim">${it.w_mm}×${it.h_mm} mm` +
+					`${it.carries_picture ? ' · picture' : ''}</span></label>`);
+			}
+			$('faceList').innerHTML = html.join('');
+			return;
+		}
 		for (const id of S.places) {
 			const p = data.get(id);
 			if (!p) continue;
@@ -323,7 +363,10 @@
 		x.fillRect(0, 0, cv.width, cv.height);
 
 		for (const it of sheet.items) {
-			const face = it.face.make({ ppmm, clay: '#ffffff', ink: '#000000', press: press() });
+			// an imported face is already the artwork; drawImage scales it to
+			// the sheet, which is why the handoff warns about its resolution
+			const face = it.taken ? it.taken.img
+				: it.face.make({ ppmm, clay: '#ffffff', ink: '#000000', press: press() });
 			// the box counts down from its top edge; the bed counts up
 			const left = (it.x - boxX) * ppmm;
 			const top = ((boxY + gr.h) - (it.y + it.h)) * ppmm;
@@ -525,6 +568,34 @@
 			const on = S.press.on;
 			S.press = { on }; pressPanel(); repaint();
 			toast('the press back to its own setting');
+		};
+
+		$('takeFaces').onclick = () => $('facesFile').click();
+		$('facesFile').onchange = async e => {
+			const files = e.target.files;
+			if (!files || !files.length) return;
+			try {
+				const got = await AE.Stapel.Handoff.read(files);
+				if (!got.items.length) return toast('the manifest listed no faces I could find');
+				taken = got;
+				// everything picked, since the file is already the selection
+				S.pick = {};
+				for (const it of got.items) S.pick['taken/' + it.tag] = true;
+				$('dropFaces').hidden = false;
+				relay(); faceRows(); draw(); foot(); save();
+                const at = got.manifest.ppmm, lines = S.burn && S.burn.lines;
+				toast(got.items.length + ' faces at ' + at + ' px/mm'
+					+ (got.missing.length ? ', ' + got.missing.length + ' missing' : '')
+					+ (lines && at < lines ? ' — coarser than the ' + lines
+						+ ' lines/mm burn, re-export finer' : ''));
+			} catch (err) {
+				toast(err.message);
+			} finally { e.target.value = ''; }
+		};
+		$('dropFaces').onclick = () => {
+			taken = null; S.pick = {}; $('dropFaces').hidden = true;
+			relay(); picker(); faceRows(); draw(); foot(); save();
+			toast('back to the volume');
 		};
 
 		$('exportSheet').onclick = () => exportSheets('one');

@@ -1019,6 +1019,12 @@
 			bx.putImageData(px, 0, 0);
 		}
 
+		// For the burner, stop here: `burn` IS the artwork -- grey 0 is full
+		// power and 255 is the head off, the same convention every other face
+		// is drawn in, where black ink fires and white clay does not. What
+		// follows is only the simulation of it.
+		if (o.artwork) return burn;
+
 		// and the brick under it: the body is the black point, the burn only
 		// ever lifts it. the same rule the brenntisch works to.
 		const body = pic.body || 'sooty';
@@ -1180,7 +1186,17 @@
 		cs.forEach((load, i) => {
 			const n = i + 1;
 			const top = load.head ? {} : { top: false };
-			const opts = (l, ov) => Object.assign({}, o, top, ov, { tag: tagFor(plate, n, l) });
+			// the same deal the yard makes, made here too -- der Brenner builds
+			// its faces from this list and has to cut the face the yard showed
+			const vary = o.faceVary || 'none';
+			const fkey = vary === 'brick' ? plate.id + '.' + i
+				: vary === 'stack' ? plate.id : null;
+			const picked = fkey ? faceFor(fkey, (o.layout && o.layout.seed) || o.seed || 7,
+										  o.facePool) : null;
+			const withFace = picked
+				? Object.assign({}, o, { display: picked, headFace: picked }) : o;
+			const opts = (l, ov) => Object.assign({}, withFace, top, ov,
+												  { tag: tagFor(plate, n, l) });
 
 			put(`c${n}b`, tagFor(plate, n, 'b'), 'stretcher', BRICK.l, BRICK.h, n, 'b',
 				ov => long(load.front, opts('b', ov)));
@@ -1197,7 +1213,14 @@
 			// the bed comes off the course that carries it, and only that one
 			if (i === 0 && o.bedOn !== 'none')
 				put(`c${n}a`, tagFor(plate, n, 'a'), 'bed', BRICK.l, BRICK.d, n, 'a',
-					ov => bed(plate, Object.assign({}, o, ov)));
+					ov => {
+						// a bed carrying a square of the yard's picture needs the
+						// square, which only the yard knows -- it arrives in ov
+						const oo = Object.assign({}, withFace, ov,
+												 { tag: tagFor(plate, n, 'a') });
+						return (oo.bedOn === 'picture' && oo.picture && oo.bedRect
+								&& bedPicture(plate, oo)) || bed(plate, oo);
+					});
 		});
 
 		// the name is one drawing for every course, so it is marked by face
