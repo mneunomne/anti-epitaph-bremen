@@ -293,6 +293,28 @@
 		x.restore();
 	}
 
+	// The faces a brick may be set in.
+	//
+	// Forty-eight bricks engraved one at a time were never going to come off
+	// one bed of type, so they do not pretend to. Each is dealt a face from
+	// this pool -- fat faces, Didones and the odd Egyptian, all of them things
+	// a jobbing printer of the 1850s would have had in a case -- and keeps it,
+	// because the pick is made from the brick's own name and the field's seed
+	// rather than from a counter. Reshuffle the yard and a brick is set again
+	// in a different face; leave it alone and it is the same one every time.
+	const FACE_POOL = ['ultra', 'abril', 'rozha', 'bevan', 'bodoni-moda',
+		'libre-bodoni', 'playfair', 'baskerville', 'didot', 'bodoni72', 'hoefler'];
+
+	function faceFor(key, seed, pool) {
+		const list = (pool && pool.length) ? pool : FACE_POOL;
+		let h = (seed >>> 0) || 1;
+		const k = String(key || '');
+		for (let i = 0; i < k.length; i++) {
+			h ^= k.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0;
+		}
+		return list[h % list.length];
+	}
+
 	const opt = o => Object.assign({}, DEFAULTS, o || {});
 	const face = id => T.Plate.faceCss(id);
 	// the figures keep their own face only if they were given one
@@ -943,10 +965,21 @@
 		// are crossfaded over a band, so a brick that is half sky and half
 		// hillside changes hand across itself without a seam.
 		if (o.bedWord !== false) {
+			// Set white on black rather than white on nothing, so the press can
+			// run over it.
+			//
+			// The press (ink.js) is the scan: it wanders every stroke edge,
+			// fattens or starves the ink, and lays grain and specks through the
+			// whole field. Skipping it here left crisp vector type sitting in a
+			// photograph that carries all three faults, and the join showed.
+			// Running the type through it first means the letters were scanned
+			// on the same machine as the picture they are cut into, and the two
+			// stop looking like different objects. pressed() takes its two
+			// colours from ink and clay, so black and white here give it the
+			// full range to work in; what comes back is read as brightness.
 			const type = bed(plate, Object.assign({}, o, {
-				clay: 'rgba(0,0,0,0)',      // no ground: only the letters carry
-				ink: '#ffffff',             // solid inside a stroke, soft at its edge
-				press: null,                // a burnt face is not run through the press
+				clay: '#000000',
+				ink: '#ffffff',
 			}));
 
 			// Which of the two a letter gets is decided by the region it sits
@@ -967,10 +1000,12 @@
 			const px = bx.getImageData(0, 0, pxW, pxH);
 			const d = px.data;
 			const m = type.getContext('2d').getImageData(0, 0, pxW, pxH).data;
+			// the pressed type is opaque, so its brightness carries the letter --
+			// including the half-bitten edges the press leaves
 			const r = region.getContext('2d').getImageData(0, 0, pxW, pxH).data;
 			for (let i = 0; i < d.length; i += 4) {
-				const a = m[i + 3];
-				if (!a) continue;                      // no letter here
+				const a = m[i];                        // white = letter, black = ground
+				if (a < 8) continue;
 				const v = d[i];
 				// 0 where the region has plenty of burn to cut into, 1 where
 				// it is bare brick, smooth across the band between
@@ -1180,7 +1215,7 @@
 
 	S.Faces = {
 		BRICK, DEFAULTS, stretcher, header, land, figures, bed, bedLayout, nameplate,
-		blank, bedPicture, courses, widest, rowName,
+		blank, bedPicture, courses, widest, rowName, faceFor, FACE_POOL,
 		sourceLine, shipsOf, shipsLine, tagFor, initials, namesFor, faceList,
 	};
 })(window);

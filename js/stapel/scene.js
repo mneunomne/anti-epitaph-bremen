@@ -270,12 +270,25 @@
 			// and every printed side carries its own mark: the brick counting
 			// down from the top, and b c d e round the four sides from the long
 			// face in view. The bed is a, and is obviously itself.
-			const fo = l => Object.assign({}, base, { tag: F.tagFor(plate, i + 1, l) });
+			// Which face this brick is set in. 'brick' deals a new one to every
+			// course, which is what forty-eight separately engraved blocks would
+			// actually look like; 'stack' keeps a good in one face all the way
+			// down; 'none' leaves whatever the panels say.
+			const vary = o.faceVary || 'none';
+			const fkey = vary === 'brick' ? plate.id + '.' + i
+				: vary === 'stack' ? plate.id : null;
+			const picked = fkey ? F.faceFor(fkey, (o.layout && o.layout.seed) || 7,
+										   o.facePool) : null;
+			const withFace = picked
+				? Object.assign({}, base, { display: picked, headFace: picked })
+				: base;
+			const fo = l => Object.assign({}, withFace, { tag: F.tagFor(plate, i + 1, l) });
 			const mats = [
 				back && faces ? mat(F.land(load.back, fo('e'))) : (endName || blank(B.d, B.h, o)),
 				faces ? mat(F.land(load.front, fo('c'))) : blank(B.d, B.h, o),
 				top && o.bedOn !== 'none'
-					? mat((o.bedOn === 'picture' && F.bedPicture(plate, o)) || F.bed(plate, o))
+					? mat((o.bedOn === 'picture' && F.bedPicture(plate, withFace)) ||
+						  F.bed(plate, withFace))
 					: blank(B.l, B.d, o),
 				blank(B.l, B.d, o),
 				faces ? mat(F.figures(load.front, fo('b'))) : blank(B.l, B.h, o),

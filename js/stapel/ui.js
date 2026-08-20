@@ -42,6 +42,7 @@
 		many: false,
 		rows: 3, gap: 2, outline: true, everyFace: true, nameOn: 'none',
 		sides: 1, bedOn: 'none', pallet: false, order: 'tallest',
+		faceVary: 'brick',      // a face per brick, per stack, or one throughout
 		pictureProject: '',     // which brenntisch project lends the tops their picture
 		maxBricks: 12,          // 0 stands for as many places as the good had
 		nameSize: 23,
@@ -183,7 +184,7 @@
 		ppmm: S.ppmm, rows: S.rows, clay: S.clay, ink: S.ink,
 		gap: S.gap, outline: S.outline, everyFace: S.everyFace, nameOn: S.nameOn,
 		sides: S.sides, bedOn: S.bedOn, pallet: S.pallet, maxBricks: S.maxBricks,
-		nameSize: S.nameSize,
+		nameSize: S.nameSize, faceVary: S.faceVary,
 		picture: S.bedOn === 'picture' ? picture : null,
 		// what the tail is called where a ceiling folds it — here it is a tail
 		// of places, not of goods
@@ -543,6 +544,7 @@
 			$('maxBricksV').value = S.maxBricks ? S.maxBricks + ' bricks' : 'as many as it takes';
 			picker(); redo(true);
 		};
+		$('faceVary').onchange = e => { S.faceVary = e.target.value; redo(false); };
 		$('bedOn').onchange = async e => {
 			S.bedOn = e.target.value;
 			sync();
@@ -659,6 +661,7 @@
 		$('maxBricks').value = S.maxBricks;
 		$('maxBricksV').value = S.maxBricks ? S.maxBricks + ' bricks' : 'as many as it takes';
 		$('bedOn').value = S.bedOn;
+		$('faceVary').value = S.faceVary;
 		$('pictureRow').hidden = S.bedOn !== 'picture';
 		$('pallet').checked = S.pallet;
 		$('order').value = S.order;
