@@ -268,11 +268,22 @@ bottom course by default — the one you lay first.
 
 **Source** — drop an image, pick one, or use one of the three bundled files.
 
-**Laser** — resolution, then grayscale / Floyd–Steinberg dither / hard
-threshold, with brightness, contrast, gamma and invert. *what burns* shows
-exactly the bitmap the head will trace, so there are no surprises. Bleed
-engraves past the brick edge so a slightly misplaced blank still lands covered.
-The pallet plan adds two noisy modes on the same engine — see below.
+**Laser** — resolution, then the five ways of getting from a photograph to
+something a laser can burn: grayscale, Floyd–Steinberg *dither*, *scatter*,
+*random* and hard *threshold*, with brightness, contrast, gamma and invert.
+They are the same five the pallet plan offers, on the same engine — see [How
+the tone is broken up](#how-the-tone-is-broken-up). *scatter* is the dither
+with its decision point jittered, so the regular weave breaks up without the
+tone shifting; *random* decides every pixel on its own against a cut that
+wanders, which is grain and no pattern at all. *grain* sets how far the cut
+wanders and *seed* fixes which grain you get — the seed is saved with the
+project and printed in the exported README, so the file you looked at and the
+file you send next week are the same file. *shuffle* goes looking for another
+one on purpose.
+
+*what burns* shows exactly the bitmap the head will trace, so there are no
+surprises. Bleed engraves past the brick edge so a slightly misplaced blank
+still lands covered.
 
 The footer warns when the source cannot actually resolve the requested dpi at
 wall size — a 990 px scan blown up to 1.5 m resolves about 16 dpi, and asking
@@ -296,6 +307,86 @@ the scope selector, or untick *gcode* and send the SVGs instead.
 **Simulation** — the wall as fired clay. Switch the burn between *darker*
 (soot) and *lighter* (cut back to the body) to match your material. Test one
 brick before committing to a wall.
+
+### The bed — what is on the machine
+
+The machine cannot reach a wall. It reaches about 410 mm square, and an NF
+stretcher is 240 × 71 — so a wall is never cut as a wall, it is cut a handful
+of bricks at a time. *the bed* is that handful: the bricks that are lying on
+the machine at this moment.
+
+**Shift-click** bricks on the wall to put them on the bed and to take them off
+again — cmd or ctrl do the same, and `b` does it for the selected brick. Run
+along a course with shift down and you have picked out a bedful. *take the
+queued* fills the bed from the ledger instead. They are marked with a dashed
+ring on every view, and they are remembered with the project.
+
+*the bed* view then shows the machine's own square with those bricks laid in
+it, numbered in the order the head will burn them — from the corner nearest
+the origin outwards, which is the shortest travel and the order a hand would
+lay them in. They lie either **packed**, in rows from that corner with the
+joint you set between them, or **as on the wall**, which keeps the block square
+and is what you want when the bricks you picked are a contiguous block. The
+courses turn over between the two, because the wall counts down from its top
+edge and the bed counts up.
+
+*each brick lies* turns the bed. An NF stretcher is 240 × 71, and a work area
+deeper than it is wide takes more of them stood on end than laid flat — so
+**turned** puts them on end, and **whichever the bed takes more of** picks for
+you.
+
+**What turns is the bed, not the brick.** Spinning each face where it lies would
+keep the arrangement and rotate the pictures inside it, which is the one thing
+that cannot be right: these are fragments of a single picture, and a fragment
+turned on its own no longer joins the one beside it. So the bed is laid out
+upright, as though the machine stood the other way round, and then the whole of
+it — the places and the pictures together — goes round a quarter turn
+anticlockwise. Nothing moves relative to anything else, so the composition
+survives, and a block picked off the wall comes back as that block. The bricks
+are also filled in the wall's own order, bottom course first and left to right,
+rather than the order they were clicked.
+
+The rotation of the raster is done on the bytes rather than through a canvas: at
+exactly ninety degrees that is a re-indexing and not a resampling, so not one
+pixel of a dithered face is turned into a gray the head cannot burn. The bed
+view draws the faces as they will lie, so there is nothing to work out — lay
+each brick the way the picture shows, and the file names the corner and says
+*turned*.
+
+*one gcode for these bricks* writes the lot as a single `.gc`. Two things it is
+careful about:
+
+- **It will not write a file the machine cannot run.** The layout is measured
+  against the work area — origin included, since the origin is the work zero —
+  and if any face falls outside it the button is dead and the panel says by how
+  much, per brick, rather than letting the limit switch find out. The footer
+  states the rectangle the head will keep to at all times.
+- **The head does not travel the bed between the bricks.** Each face is
+  rastered on its own, at its own corner, and the bodies are strung together —
+  so the beam only ever crosses the faces themselves. A single raster spanning
+  the whole bed would sweep every scanline across the bare ground between them,
+  at feedrate, for every line of the job.
+
+Two things the emitter is strict about, both learned the hard way. **Every
+comment is folded to 70 columns of plain ASCII.** GRBL reads one line at a time
+into a 128-byte serial buffer, and a longer line does not merely wrap — it
+overflows, the controller errors on it, and since the header stands before the
+first move the job then does nothing at all: no frame, no burn, no useful
+complaint. An em dash is three bytes and a `×` is two, so a header set in this
+desk's own typography runs half again as long as it looks. The prose belongs on
+the screen; what goes down the wire is plain. **And the fit check counts the
+run-up, not just the faces.** Overscan carries the head past the end of every
+row before the beam comes on, so checking the faces alone would pass a file that
+drives the head into the rail.
+
+The file names each brick and the corner it is laid to, in the header, so the
+bed can be set out from the file and checked against it afterwards. With *walk
+the work before the beam is on* ticked the head traces the work rectangle in
+rapids before anything is lit — square the bricks to that, and the framing box
+is the bricks rather than whatever the ink happened to reach.
+
+The zip's scope selector has *only what is on the bed* to match, so the PNGs
+and SVGs for the same handful come out alongside it.
 
 ### The record
 
@@ -331,8 +422,8 @@ into one file you can back up or move to another machine.
 ```
 
 The scope selector next to *export zip* limits it to what is not yet engraved,
-to the queued, or to the one selected brick — so you can cut in batches instead
-of regenerating a whole wall each time.
+to the queued, to the one selected brick, or to what is on the bed — so you can
+cut in batches instead of regenerating a whole wall each time.
 
 ## The trade tables
 

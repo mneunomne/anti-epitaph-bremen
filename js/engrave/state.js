@@ -34,7 +34,12 @@
 				// the plate the moment one is loaded, because a scan almost
 				// never fills the range it is given and an unfitted one burns
 				// as a haze — see Imaging.autoRange
-				inLo: 0, inHi: 255
+				inLo: 0, inHi: 255,
+				// for the noisy modes: how far the cut wanders either side of
+				// itself, and the seed that makes the grain repeatable. the
+				// seed is saved with the project, so the file you looked at
+				// and the file you send next week are the same file.
+				noise: 100, seed: 1
 			},
 			// the machine itself. defaults are the longer / grbl profile:
 			// 254 dpi is 0.1 mm, which is the 10 lines/mm the controller wants
@@ -50,6 +55,13 @@
 			// they stand as bare brick inside the bleached picture
 			word: { text: '', mode: 'mask', size: 70, x: 50, y: 50, caps: true },
 			sim: { polarity: 'lighter', body: 'sooty' },
+			// the handful of bricks that are on the machine right now. a wall
+			// is metres across and the bed is 410 mm square, so nothing is
+			// ever cut as a wall — see bed.js
+			bed: {
+				ids: [], w: 410, h: 410, margin: 5, gap: 4,
+				arrange: 'packed', turn: 'upright', frame: true
+			},
 			image: null,          // { name, type, blob }
 			tiles: {},            // id -> { status, date, operator, passes, notes }
 			log: []
@@ -67,6 +79,8 @@
 		p.gcode = Object.assign({}, base.gcode, p.gcode);
 		p.word = Object.assign({}, base.word, p.word);
 		p.sim = Object.assign({}, base.sim, p.sim);
+		p.bed = Object.assign({}, base.bed, p.bed);
+		p.bed.ids = Array.isArray(p.bed.ids) ? p.bed.ids : [];
 		p.tiles = p.tiles || {};
 		p.log = p.log || [];
 		return p;

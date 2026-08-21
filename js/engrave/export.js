@@ -117,7 +117,7 @@ brick
 
 laser
   resolution    ${l.dpi} dpi
-  mode          ${l.mode}${l.mode === 'threshold' ? ` at ${l.threshold}` : ''}
+  mode          ${l.mode}${l.mode === 'threshold' || l.mode === 'random' ? ` cutting at ${l.threshold}` : ''}${l.mode === 'random' || l.mode === 'scatter' ? `, grain ${l.noise}% from seed ${l.seed} — the same seed gives the same grain, so this file can be written again` : ''}
   levels        brightness ${l.brightness}, contrast ${l.contrast}%, gamma ${l.gamma}${l.invert ? ', inverted' : ''}
   bleed         ${n(l.bleed || 0)} mm past the face edge
   tile raster   ${rows[0] ? rows[0].px_w + ' × ' + rows[0].px_h + ' px' : '—'}

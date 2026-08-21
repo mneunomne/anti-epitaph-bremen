@@ -53,6 +53,10 @@
 		clay: '#5e3321', ink: '#d2c3b9',
 		ppmm: 8,
 		exScope: 'one', exPpmm: 24, exGround: 'clay',
+		// what has been picked off the faces of the bricks, by mark: the mark
+		// is what the exporter names its files by, so a picking is a list of
+		// filenames agreed on before there are any files
+		picks: {},
 		layout: { cols: 6, rows: 8, gapX: 120, gapZ: 120, stagger: 0, jitter: 0, turn: 0, seed: 7 },
 		// overrides on ink.js, the same way the faces are overrides on faces.js
 		press: { on: false },
@@ -188,6 +192,12 @@
 		sides: S.sides, bedOn: S.bedOn, pallet: S.pallet, maxBricks: S.maxBricks,
 		nameSize: S.nameSize, faceVary: S.faceVary,
 		picture: S.bedOn === 'picture' ? picture : null,
+		// the tops carry the picture and nothing else. the good's name used to
+		// be cut out of the square — see bedPicture — but a knockout wants
+		// something round it to be a hole in, and the picture is what the tops
+		// are for. so the square crosses whole, and the reading of it stays on
+		// the sides, where it is printed.
+		bedWord: false,
 		// what the tail is called where a ceiling folds it — here it is a tail
 		// of places, not of goods
 		fold: 'Uebrige Länder',
@@ -378,10 +388,141 @@
 
 	// what the export writes, off the one list in faces.js — the same faces in
 	// the same order with the same marks the yard prints and the engraver burns
-	function facesOf(plate, o) {
+	function facesOf(plate, o, rects) {
 		// a file is named for the mark that is on the face — br.3b and no more,
 		// so a folder of them sorts into stacks and reads like the bricks do
-		return Faces.faceList(plate, o).map(f => [f.tag, () => f.make()]);
+		return Faces.faceList(plate, o).map(f => {
+			// a top carrying a square of the picture needs the square, and only
+			// the yard knows which one it stood over
+			const rect = rects && rects[f.tag];
+			return [f.tag, () => f.make(rect ? { bedRect: rect } : {})];
+		});
+	}
+
+	// Where the goods asked for are standing, and which square of the picture
+	// each of their tops carries. Both are read back off the yard rather than
+	// worked out again: the yard is what actually dealt the places, and a
+	// second reckoning here could only ever disagree with it.
+	//
+	// Every way out of this page goes through here — the bag for der Brenner
+	// and the loose pngs alike — so a top cannot come off one of them with its
+	// picture and off the other without.
+	function offTheYard(ps) {
+		const rects = {}, stands = [];
+		for (const q of Scene.placement()) {
+			const p = ps.find(x => x.id === q.id);
+			if (!p) continue;
+			stands.push({ id: p.id, good: p.title, x_mm: Math.round(q.x), z_mm: Math.round(q.z) });
+			if (S.bedOn === 'picture' && picture && q.bedRect)
+				rects[Faces.tagFor(p, 1, 'a')] = q.bedRect;
+		}
+		return { rects, stands };
+	}
+
+	/* -------------------------------------------------------- what is picked */
+
+	/* Faces are picked in the yard, by clicking them, and what comes back is a
+	 * mark — br.3b, the third brick down of Branntwein, its long face. That is
+	 * the same mark faces.js prints in the margin of the face, the same one the
+	 * exporter names the png by, and the same one der Brenner lists on its bed.
+	 * So a picking survives everything: turn the yard, reshuffle the field,
+	 * change the setting, come back tomorrow — the mark still names that face
+	 * or that face is gone, and there is no third possibility.
+	 *
+	 * The yard only knows about the goods currently standing in it. A face
+	 * picked off a good that has since been stepped away from is still held
+	 * here, and the good is fetched back out of the volume when it comes time
+	 * to cut it.
+	 */
+	function picksChanged(shown) {
+		const held = {};
+		for (const t of Scene.pickedTags()) held[t] = S.picks[t] || { tag: t };
+		for (const it of shown) held[it.tag] = it;
+		S.picks = held;
+		pickRow();
+		save();
+	}
+
+	// the goods a picking touches, standing ones in the order the yard has
+	// them and the rest fetched back out of the volume
+	function pickPlates(tags) {
+		const want = new Set(tags.map(t => (S.picks[t] || {}).id).filter(Boolean));
+		const standing = ordered().filter(p => want.has(p.id));
+		const seen = new Set(standing.map(p => p.id));
+		return standing.concat(Array.from(want)
+			.filter(id => !seen.has(id)).map(id => data.get(id)).filter(Boolean));
+	}
+
+	function pickRow() {
+		const tags = Object.keys(S.picks);
+		const n = tags.length;
+		$('exportPicked').hidden = !n;
+		$('clearPicks').hidden = !n;
+		if (n) $('exportPicked').textContent =
+			`export the ${n} picked face${n === 1 ? '' : 's'}`;
+		$('pickHint').textContent = n
+			? 'these and nothing else go in the bag. click a marked face again to let it go.'
+			: 'click a face in the yard to pick it, shift-click to take the whole brick. '
+			+ 'what is picked is marked in amber, and can be handed over on its own.';
+
+		// by good, in the order the yard stands them, and by the mark within a
+		// good — so the listing reads down a stack the way the bricks do
+		const here = new Set(ordered().map(p => p.id));
+		const byGood = new Map();
+		for (const t of tags.sort()) {
+			const it = S.picks[t];
+			const k = it.good || it.id || '—';
+			if (!byGood.has(k)) byGood.set(k, []);
+			byGood.get(k).push(it);
+		}
+		$('pickList').innerHTML = Array.from(byGood).map(([good, its]) =>
+			`<div class="pick-good">${esc(good)}` +
+			(its[0] && its[0].id && !here.has(its[0].id)
+				? '<span class="away">not standing</span>' : '') + `</div>` +
+			its.map(it => `<button class="pick" data-drop="${esc(it.tag)}" ` +
+				`title="let this face go">${esc(it.tag)}</button>`).join('')
+		).join('');
+	}
+
+	/* ------------------------------------------------- the bag for der Brenner */
+
+	// A yard is cut and handed over again all afternoon, and two bags called
+	// faces-1783.zip are two bags the second of which is called faces-1783 (1).
+	// So the minute it was cut goes in the name: in a downloads folder that is
+	// the only thing that tells one from the next.
+	function stamp(d) {
+		const p = n => String(n).padStart(2, '0');
+		return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`
+			+ `-${p(d.getHours())}${p(d.getMinutes())}`;
+	}
+
+	async function handoff(only) {
+		const ps = only ? pickPlates(only) : ordered();
+		if (!ps.length) return toast(only ? 'nothing is picked' : 'nothing is standing');
+
+		const btn = $(only ? 'exportPicked' : 'exportFaces');
+		const said = btn.textContent;
+		btn.disabled = true;
+		try {
+			const { rects, stands } = offTheYard(ps);
+			const now = new Date();
+			const { zip, manifest } = await Handoff.build(ps, faceOpts(), {
+				ppmm: S.hoPpmm, year: S.year, seed: S.layout.seed,
+				picture: S.bedOn === 'picture' ? picture : null,
+				bedRects: rects, stands: stands, only: only,
+				now: now.toISOString(),
+			}, (i, n, tag) => { btn.textContent = 'cutting ' + (i + 1) + '/' + n + '  ' + tag; });
+
+			if (!manifest.faces.length) return toast('none of those faces are cut at this setting');
+			AE.download(zip.blob(),
+				`faces-${S.year}${only ? '-picked' : ''}-${stamp(now)}.zip`);
+			toast(manifest.faces.length + ' faces at ' + manifest.ppmm + ' px/mm'
+				+ ' — white is the engraving, der Brenner turns them round');
+		} catch (err) {
+			toast('export failed: ' + err.message);
+		} finally {
+			btn.disabled = false; btn.textContent = said;
+		}
 	}
 
 	// what the export is about to write, so the button can say so before it is
@@ -401,12 +542,13 @@
 		});
 		const ps = exPlates();
 		if (!ps.length) return;
+		const { rects } = offTheYard(ps);
 
-		const btn = $('exportFaces');
+		const btn = $('exportPngs');
 		btn.disabled = true;
 		let n = 0, total = ps.reduce((s, p) => s + facesOf(p, o).length, 0);
 		for (const plate of ps) {
-			for (const [name, make] of facesOf(plate, o)) {
+			for (const [name, make] of facesOf(plate, o, rects)) {
 				const canvas = make();
 				const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
 				const a = document.createElement('a');
@@ -435,7 +577,7 @@
 			`a long face ${px(Faces.BRICK.l)} × ${px(Faces.BRICK.h)} px · ` +
 			`a small one ${px(Faces.BRICK.d)} × ${px(Faces.BRICK.h)} · ` +
 			`a bed ${px(Faces.BRICK.l)} × ${px(Faces.BRICK.d)}`;
-		$('exportFaces').textContent = `export the faces — ${n} file${n === 1 ? '' : 's'}`;
+		$('exportPngs').textContent = `export the faces — ${n} file${n === 1 ? '' : 's'}`;
 	}
 
 	/* ------------------------------------------------------------------ ui */
@@ -551,35 +693,12 @@
 			S.hoPpmm = num(e.target.value, 12);
 			$('hoPpmmV').value = S.hoPpmm + ' px/mm'; save();
 		};
-		$('exportFaces').onclick = async () => {
-			const ps = ordered();
-			if (!ps.length) return toast('nothing is standing');
-			const btn = $('exportFaces'); btn.disabled = true;
-			try {
-				// the squares of the picture belong to where a stack stands, so
-				// they are read back off the yard rather than worked out again
-				const rects = {};
-				if (S.bedOn === 'picture' && picture) {
-					for (const q of Scene.placement()) {
-                        const p = ps.find(x => x.id === q.id);
-                        if (p && q.bedRect) rects[Faces.tagFor(p, 1, 'a')] = q.bedRect;
-					}
-				}
-				const { zip, manifest } = await Handoff.build(ps, faceOpts(), {
-					ppmm: S.hoPpmm, year: S.year, seed: S.layout.seed,
-					picture: S.bedOn === 'picture' ? picture : null,
-					bedRects: rects, now: new Date().toISOString(),
-				}, (i, n, tag) => { btn.textContent = 'cutting ' + (i + 1) + '/' + n + '  ' + tag; });
-				const url = URL.createObjectURL(zip.blob());
-				const a = document.createElement('a');
-				a.href = url; a.download = 'faces-' + S.year + '.zip'; a.click();
-				setTimeout(() => URL.revokeObjectURL(url), 4000);
-				toast(manifest.faces.length + ' faces at ' + manifest.ppmm + ' px/mm');
-			} catch (err) {
-				toast('export failed: ' + err.message);
-			} finally {
-				btn.disabled = false; btn.textContent = 'export the faces for der Brenner';
-			}
+		$('exportFaces').onclick = () => handoff(null);
+		$('exportPicked').onclick = () => handoff(Object.keys(S.picks));
+		$('clearPicks').onclick = () => Scene.unpick(null);
+		$('pickList').onclick = e => {
+			const b = e.target.closest('[data-drop]');
+			if (b) Scene.unpick(b.dataset.drop);
 		};
 		$('bedOn').onchange = async e => {
 			S.bedOn = e.target.value;
@@ -660,6 +779,7 @@
 		$('vFront').onclick = () => { Scene.view(0, 0.12, false); Scene.frame(); };
 		$('vCorner').onclick = () => { Scene.view(-0.62, 0.30, false); Scene.frame(); };
 		$('vFrame').onclick = () => Scene.frame();
+		$('exportPngs').onclick = exportFaces;
 		$('exScope').onchange = e => { S.exScope = e.target.value; exFoot(); save(); };
 		$('exGround').onchange = e => { S.exGround = e.target.value; save(); };
 		$('exPpmm').oninput = e => {
@@ -667,7 +787,6 @@
 			$('exPpmmV').value = S.exPpmm + ' px/mm';
 			exFoot(); save();
 		};
-		$('exportFaces').onclick = exportFaces;
 
 		$('exportPng').onclick = () => {
 			const a = document.createElement('a');
@@ -779,6 +898,11 @@
 		if (!chosen().length) { document.body.innerHTML = '<p style="padding:40px">that volume has no goods.</p>'; return; }
 
 		Scene.init($('stage'), $('canvasWrap'));
+		Scene.onPick(picksChanged);
+		// the marks the page was left with, handed back before the first build
+		// so they are laid on as the bricks are made rather than after
+		if (S.picks && typeof S.picks === 'object') Scene.setPicks(Object.keys(S.picks));
+		else S.picks = {};
 		wire(); sync(); panels(); picker();
 		// the tops cannot be drawn before the picture is decoded, so the yard
 		// waits for it rather than being built twice

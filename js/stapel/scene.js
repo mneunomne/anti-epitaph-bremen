@@ -69,6 +69,16 @@
 	}
 
 	let renderer, scene, persp, ortho, group, ground, wrap;
+	// every brick standing, for the hit test; and what has been picked off them
+	let bricks = [];
+	const picked = new Set();              // face marks, so a pick outlives a rebuild
+	// mark -> what it is, and every place on the yard it shows. A name face is
+	// one drawing hung on every course of its stack, so it shows in several
+	// places and is still one file; a printed side shows in exactly one.
+	const known = new Map();
+	let onPicked = null;
+	let hover = null;                      // the mark under the pointer, if any
+	let at = null;                         // where the pointer is, in the canvas
 	let flat = false;                      // the plan camera
 	let cam = { az: -0.62, el: 0.30, dist: 9.5, target: new THREE.Vector3(0, 0, 0) };
 	let drag = null;
@@ -122,19 +132,29 @@
 
 	function orbit(el) {
 		el.addEventListener('pointerdown', e => {
-			drag = { x: e.clientX, y: e.clientY, az: cam.az, el: cam.el };
+			drag = { x: e.clientX, y: e.clientY, az: cam.az, el: cam.el, moved: 0 };
 			el.setPointerCapture(e.pointerId);
 			el.style.cursor = 'grabbing';
 		});
 		el.addEventListener('pointermove', e => {
+			mark(e);
 			if (!drag) return;
+			// how far the hand travelled, so a turn of the yard is not mistaken
+			// for a tap on a face at the end of it
+			drag.moved += Math.abs(e.movementX || 0) + Math.abs(e.movementY || 0);
 			cam.az = drag.az - (e.clientX - drag.x) * 0.006;
 			cam.el = Math.max(-0.25, Math.min(1.55, drag.el + (e.clientY - drag.y) * 0.005));
 		});
+		el.addEventListener('pointerleave', () => { at = null; setHover(null); });
 		const up = e => {
+			const tap = drag && drag.moved < 5;
 			drag = null;
 			el.style.cursor = 'grab';
 			try { el.releasePointerCapture(e.pointerId); } catch (_) { }
+			if (tap && e.type === 'pointerup' && e.button === 0) {
+				mark(e);
+				tapped(e.shiftKey);
+			}
 		};
 		el.addEventListener('pointerup', up);
 		el.addEventListener('pointercancel', up);
@@ -143,6 +163,211 @@
 			cam.dist = Math.max(0.8, Math.min(400, cam.dist * (1 + Math.sign(e.deltaY) * 0.09)));
 		}, { passive: false });
 		el.style.cursor = 'grab';
+	}
+
+
+	/* -------------------------------------------------------------- picking */
+
+	/* A face is picked off the yard itself rather than out of a list.
+	 *
+	 * The list exists — faces.js knows every face of every brick and the
+	 * exporter walks it — but reading `br.3b` in a column tells you nothing
+	 * about what is on it. Standing in the yard and clicking the face does,
+	 * and the mark it hands back is the same mark the exporter names its
+	 * files by, so what is picked here is exactly what comes out of there.
+	 *
+	 * What is held is the mark and never the mesh. Turn the yard round,
+	 * reshuffle the field, change the setting and rebuild: the bricks are all
+	 * new objects and the picks are still the same faces, or they are quietly
+	 * gone because that face no longer exists.
+	 */
+
+	// BoxGeometry hands its materials out as [ +X, -X, +Y, -Y, +Z, -Z ], and
+	// stack() fills them in that order — so this is the face letters in the
+	// order the hit test will report them. -Y is the underside, which is laid
+	// on the one below it and is never printed.
+	const LETTERS = ['e', 'c', 'a', null, 'b', 'd'];
+
+	const HALF = i => i === 0 ? [1, 0, 0] : i === 1 ? [-1, 0, 0] : i === 2 ? [0, 1, 0]
+		: i === 4 ? [0, 0, 1] : [0, 0, -1];
+
+	let ray = null, ndc = null;
+	const mark = e => {
+		const r = renderer.domElement.getBoundingClientRect();
+		at = { x: (e.clientX - r.left) / r.width * 2 - 1, y: -((e.clientY - r.top) / r.height) * 2 + 1 };
+	};
+
+	// where a mark shows: one face of one brick, or several if the drawing is
+	// hung on several — the stack's name face is on every course of it
+	const spot = (tag, brick, index, about) => {
+		let w = known.get(tag);
+		if (!w) known.set(tag, w = Object.assign({ spots: [] }, about));
+		w.spots.push({ brick, index });
+	};
+
+	// what face of what brick the pointer is over, or nothing. Only the
+	// nearest brick is considered: a blank side is not a miss to look past,
+	// it is the brick, and what stands behind it is not what was clicked at.
+	// The panes are children of the bricks and are not searched, or a face
+	// once picked could never be clicked again.
+	function hit() {
+		if (!at || !bricks.length) return null;
+		ray = ray || new THREE.Raycaster();
+		ndc = ndc || new THREE.Vector2();
+		ndc.set(at.x, at.y);
+		ray.setFromCamera(ndc, camera());
+		const h = ray.intersectObjects(bricks, false)[0];
+		const i = h && h.face ? h.face.materialIndex : null;
+		const tag = h && i != null ? (h.object.userData.faces || [])[i] : null;
+		return tag ? { tag, brick: h.object, index: i } : null;
+	}
+
+	function tapped(whole) {
+		if (!bricks.length) return;
+		const h = hit();
+		if (!h) return;
+		// shift takes the brick rather than the face — six taps' worth of a
+		// brick that is going on the bed whole anyway
+		const tags = whole ? h.brick.userData.faces.filter(Boolean) : [h.tag];
+		const off = picked.has(h.tag);
+		for (const t of tags) {
+			if (off) { picked.delete(t); dress(t, false); }
+			else if (!picked.has(t)) { picked.add(t); dress(t, true); }
+		}
+		if (onPicked) onPicked(list());
+	}
+
+	/* ------------------------------------------------------------- the mark */
+
+	// A picked face is shown by a pane laid on it, not by touching the face
+	// itself: the textures are shared — one nameplate hangs on every course of
+	// a stack — so tinting a material would light up every brick wearing it.
+	const PICK = '#f0b040', OVER = '#e8ded2';
+
+	const panes = new Map();               // mark -> the panes lying on that face
+
+	function pane(brick, i, colour, strong) {
+		const w = (i === 0 || i === 1) ? B.d : B.l;
+		const h = (i === 2) ? B.d : B.h;
+		const g = new THREE.PlaneGeometry(w * MM, h * MM);
+		const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+			color: colour, transparent: true, opacity: strong ? 0.3 : 0.16,
+			depthWrite: false, side: THREE.DoubleSide,
+		}));
+		const edge = new THREE.LineSegments(
+			new THREE.EdgesGeometry(g),
+			new THREE.LineBasicMaterial({ color: colour, transparent: true, opacity: strong ? 1 : 0.7 })
+		);
+		m.add(edge);
+		if (i === 0) m.rotation.y = Math.PI / 2;
+		else if (i === 1) m.rotation.y = -Math.PI / 2;
+		else if (i === 2) m.rotation.x = -Math.PI / 2;
+		else if (i === 5) m.rotation.y = Math.PI;
+		// a hair clear of the face, or the two surfaces fight over the pixel
+		const [x, y, z] = HALF(i);
+		const off = 0.0016;
+		m.position.set(
+			x * (B.l * MM / 2 + (x ? off : 0)),
+			y * (B.h * MM / 2 + (y ? off : 0)),
+			z * (B.d * MM / 2 + (z ? off : 0))
+		);
+		m.renderOrder = 2;
+		brick.add(m);
+		return m;
+	}
+
+	function drop(m) {
+		if (!m) return;
+		if (m.parent) m.parent.remove(m);
+		m.traverse(o => {
+			if (o.geometry) o.geometry.dispose();
+			if (o.material) o.material.dispose();
+		});
+	}
+
+	// lay the mark on a face, or take it off — everywhere that face shows
+	function dress(tag, on) {
+		for (const m of panes.get(tag) || []) drop(m);
+		panes.delete(tag);
+		if (!on) return;
+		const w = known.get(tag);
+		if (!w) return;
+		panes.set(tag, w.spots.filter(s => s.brick.parent)
+			.map(s => pane(s.brick, s.index, PICK, true)));
+	}
+
+	let hoverPanes = [];
+	function setHover(tag) {
+		if (hover === tag) return;
+		hover = tag;
+		for (const m of hoverPanes) drop(m);
+		hoverPanes = [];
+		const w = tag && !picked.has(tag) ? known.get(tag) : null;
+		if (w) hoverPanes = w.spots.filter(s => s.brick.parent)
+			.map(s => pane(s.brick, s.index, OVER, false));
+		if (renderer) renderer.domElement.style.cursor =
+			drag ? 'grabbing' : (tag ? 'pointer' : 'grab');
+	}
+
+	// Hover is worked out off the last known pointer rather than on every
+	// pointermove — the pointer moves far more often than the picture is
+	// drawn. And it is only worked out again when there is something new to
+	// see: the yard is a few hundred boxes, and casting a ray through all of
+	// them sixty times a second to be told the same answer is a waste of a
+	// machine that is already carrying the textures.
+	let looked = '';
+	function hovering() {
+		if (!pickable || drag || !at) { if (hover) setHover(null); looked = ''; return; }
+		const now = at.x + ',' + at.y + ',' + cam.az + ',' + cam.el + ',' + cam.dist + ',' + bricks.length;
+		if (now === looked) return;
+		looked = now;
+		const h = hit();
+		setHover(h ? h.tag : null);
+	}
+
+	let pickable = true;
+	function setPickable(on) {
+		pickable = !!on;
+		if (!pickable) setHover(null);
+	}
+
+	// what is picked, in the order the yard stands rather than the order it
+	// was clicked in — so a listing of it reads down the stacks
+	function list() {
+		const out = [];
+		for (const [tag, w] of known)
+			if (picked.has(tag)) out.push({
+				tag, id: w.id, good: w.good, course: w.course, letter: w.letter,
+			});
+		return out;
+	}
+
+	// hand the yard a picking it made earlier. Marks it does not know are kept
+	// rather than dropped: the yard may be standing on a different year or a
+	// different cut at this moment, and the face they name may well come back.
+	function setPicks(tags) {
+		for (const t of Array.from(picked)) dress(t, false);
+		picked.clear();
+		for (const t of tags || []) picked.add(t);
+		for (const t of picked) if (known.has(t)) dress(t, true);
+	}
+
+	function unpick(tag) {
+		if (tag == null) { for (const t of Array.from(picked)) dress(t, false); picked.clear(); }
+		else { picked.delete(tag); dress(tag, false); }
+		if (onPicked) onPicked(list());
+	}
+
+	// After a rebuild the bricks are all new objects, so the marks are laid on
+	// again. A mark whose face is not in this yard is kept and simply not
+	// shown: with one good standing at a time, stepping to the next one would
+	// otherwise throw away everything picked off the last, and a pick is a
+	// claim about a face of a brick, not about what happens to be in view.
+	function redress() {
+		panes.clear();
+		looked = '';
+		for (const tag of picked) if (known.has(tag)) dress(tag, true);
+		if (onPicked) onPicked(list());
 	}
 
 	function resize() {
@@ -178,6 +403,9 @@
 		c.lookAt(cam.target);
 		if (flat) frustum();
 		renderer.render(scene, c);
+		// after the frame, so the ray is cast through the camera as it now
+		// stands rather than through where it was a frame ago
+		hovering();
 	}
 
 	/* --------------------------------------------------------------- build */
@@ -218,6 +446,8 @@
 			}
 		});
 		while (group.children.length) group.remove(group.children[0]);
+		bricks = [];
+		known.clear();
 		blanks = {};
 		woodMat = null;              // disposed with the rest; made again on demand
 		bytes = 0; count = 0;
@@ -244,6 +474,13 @@
 		// two faces the name would have gone on: they carry the next places
 		// instead.
 		const nameOn = two ? 'none' : (o.nameOn || 'none');
+		// Which marks the exporter will actually write for this stack. A face
+		// is only pickable if there is a file behind it — the cut-by-good
+		// setting merges the two printed sides into one, for instance, and the
+		// small face the yard still shows is then not a face anyone can hand
+		// over. Asking faces.js rather than working it out again is the whole
+		// reason the two never disagree.
+		const cuts = new Set(F.faceList(plate, o).map(f => f.tag));
 		const endName = (nameOn === 'end' || nameOn === 'both')
 			? mat(F.nameplate(plate, B.d, B.h, Object.assign({}, o, { tag: F.tagFor(plate, '', 'e') }))) : null;
 		const backName = (nameOn === 'back' || nameOn === 'both')
@@ -298,6 +535,33 @@
 			const brick = new THREE.Mesh(geo.clone(), mats);
 			brick.position.set(0, y, 0);
 			g.add(brick);
+
+			// the same six slots the materials went into, named — so a hit on
+			// material 4 is a hit on br.3b and can be handed to the exporter
+			// under that name. A slot with nothing to hand over holds nothing,
+			// and a click there is a click on the brick, not on a face.
+			const cn = i + 1;
+			// a printed side belongs to its course; a name face belongs to the
+			// stack and is marked with no course at all, which is what course 0
+			// means here and in faces.js
+			const mine = l => [F.tagFor(plate, cn, l), cn];
+			const ours = l => [F.tagFor(plate, '', l), 0];
+			const slots = [
+				back && faces ? mine('e') : (endName ? ours('e') : null),
+				faces ? mine('c') : null,
+				top && o.bedOn !== 'none' ? mine('a') : null,
+				null,
+				faces ? mine('b') : null,
+				back && faces ? mine('d') : (backName ? ours('d') : null),
+			];
+			const tags = slots.map(sl => (sl && cuts.has(sl[0])) ? sl[0] : null);
+			brick.userData.faces = tags;
+			bricks.push(brick);
+			for (let k = 0; k < tags.length; k++)
+				if (tags[k]) spot(tags[k], brick, k, {
+					id: plate.id, good: plate.title,
+					letter: LETTERS[k], course: slots[k][1],
+				});
 
 			if (o.outline !== false) {
 				const line = new THREE.LineSegments(
@@ -429,6 +693,8 @@
 			&& (maxX - minX) <= PAL.l + 0.01
 			&& (maxZ - minZ) <= PAL.d + 0.01;
 		if (o.pallet) group.add(pallet());
+		// the bricks are all new objects, so the picks are laid on again
+		redress();
 
 		built = {
 			stacks: n,
@@ -510,7 +776,9 @@
 
 	S.Scene = {
 		init, build, frame, view, snapshot, resize, isFlat, PAL, placement, fitToPallet,
-		setBuilder, setFramePad,
+		setBuilder, setFramePad, setPickable,
+		picks: list, setPicks, unpick, onPick: fn => { onPicked = fn; },
+		pickedTags: () => Array.from(picked),
 		get built() { return built; }, MM, cam,
 	};
 })(window);

@@ -41,6 +41,7 @@
 			<option value="todo">only what is not engraved</option>
 			<option value="queued">only the queued</option>
 			<option value="one">only the selected brick</option>
+			<option value="bed">only what is on the bed</option>
 		</select>
 		<label class="check" title="include a ready-to-send .gc per brick"><input type="checkbox" id="withGcode"
 				checked> gcode</label>
@@ -119,13 +120,23 @@
 				<label>mode
 					<select id="mode">
 						<option value="grayscale">grayscale — power follows tone</option>
-						<option value="dither">dither — floyd–steinberg 1-bit</option>
+						<option value="dither">dither — floyd–steinberg, an even weave</option>
+						<option value="scatter">scatter — the same, with the weave broken up</option>
+						<option value="random">random — white noise, no pattern at all</option>
 						<option value="threshold">threshold — hard black / white</option>
 					</select>
 				</label>
 				<label class="thresholdOnly">cut at <input type="range" id="threshold" min="1" max="254">
 					<output id="thresholdV"></output>
 				</label>
+				<label class="noiseOnly">grain <input type="range" id="noise" min="0" max="100">
+					<output id="noiseV"></output>
+				</label>
+				<div class="pair noiseOnly">
+					<label>seed <input type="number" id="seed" min="1" max="99999" step="1"></label>
+					<label>&nbsp;<button id="reseed" class="wide">shuffle</button></label>
+				</div>
+				<p class="hint noiseOnly" id="noiseHint">—</p>
 				<label>brightness <input type="range" id="brightness" min="-100" max="100">
 					<output id="brightnessV"></output>
 				</label>
@@ -199,6 +210,35 @@
 			</section>
 
 			<section>
+				<h2>the bed</h2>
+				<p class="hint">the machine cannot reach a wall. pick the few bricks that are
+					on it right now — shift-click them — and take one file for the lot.</p>
+				<div class="pair">
+					<label>work area ↔ <input type="number" id="bedW" min="20" step="1"><i>mm</i></label>
+					<label>work area ↕ <input type="number" id="bedH" min="20" step="1"><i>mm</i></label>
+				</div>
+				<label>set out
+					<select id="bedArrange"></select>
+				</label>
+				<label>each brick lies
+					<select id="bedTurn"></select>
+				</label>
+				<div class="pair">
+					<label>in from the corner <input type="number" id="bedMargin" min="0" step="0.5"><i>mm</i></label>
+					<label>between them <input type="number" id="bedGap" min="0" step="0.5"><i>mm</i></label>
+				</div>
+				<label class="check"><input type="checkbox" id="bedFrame"> walk the work before the beam is on</label>
+				<div id="bedList" class="bed-list"></div>
+				<p class="hint" id="bedHint">—</p>
+				<div class="bulk">
+					<button id="bedAdd">add the selected</button>
+					<button id="bedQueued">take the queued</button>
+					<button id="bedClear">clear</button>
+				</div>
+				<button id="bedGcode" class="wide primary">one gcode for these bricks</button>
+			</section>
+
+			<section>
 				<h2>simulation</h2>
 				<label>brick body
 					<select id="bodyTone"></select>
@@ -235,6 +275,7 @@
 					<button data-view="laser">what burns</button>
 					<button data-view="source">source</button>
 					<button data-view="status">status</button>
+					<button data-view="bed">the bed</button>
 				</div>
 				<div class="grow"></div>
 				<label class="check"><input type="checkbox" id="showLabels" checked> labels</label>
@@ -317,6 +358,7 @@
 	<script src="js/engrave/tiling.js"></script>
 	<script src="js/engrave/imaging.js"></script>
 	<script src="js/engrave/gcode.js"></script>
+	<script src="js/engrave/bed.js"></script>
 	<script src="js/engrave/export.js"></script>
 	<script src="js/engrave/state.js"></script>
 	<script src="js/engrave/ui.js"></script>

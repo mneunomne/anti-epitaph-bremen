@@ -165,3 +165,50 @@ input[type=color] {
 .laid-row[data-strike] {
 	cursor: pointer;
 }
+
+/* ---------------- the faces picked off the yard ---------------- */
+
+/* The marks are set in the same amber the panes in the yard are drawn in, so
+   the listing and the bricks read as one thing rather than two. A mark is a
+   button because letting a face go is what anyone does next with it. */
+
+#pickList {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 3px;
+	margin: 4px 0 0;
+}
+
+.pick-good {
+	flex: 0 0 100%;
+	font-size: 10px;
+	letter-spacing: .08em;
+	text-transform: uppercase;
+	color: var(--dim);
+	margin: 5px 0 1px;
+	display: flex;
+	justify-content: space-between;
+	gap: 6px;
+}
+
+.pick-good .away {
+	text-transform: none;
+	letter-spacing: 0;
+	color: var(--faint);
+	font-style: italic;
+}
+
+button.pick {
+	padding: 1px 5px;
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	border-color: #6b4a1c;
+	color: #f0b040;
+	background: transparent;
+}
+
+button.pick:hover {
+	border-color: var(--failed);
+	color: var(--failed);
+	text-decoration: line-through;
+}

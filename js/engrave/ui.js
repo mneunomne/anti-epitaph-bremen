@@ -2,7 +2,7 @@
 // record on the right, the ledger underneath. everything saves itself.
 (function () {
 	const AE = window.AE;
-	const { Tiling, Imaging, Project, Exporter } = AE;
+	const { Tiling, Imaging, Project, Exporter, Bed } = AE;
 
 	const $ = id => document.getElementById(id);
 	const LAST = 'ae.lastProject';
@@ -128,9 +128,17 @@
 		failed: '#c0563e', skipped: '#4f4b47'
 	};
 
+	// a move is a change of power along a scanline, so what a mode costs is
+	// how often it changes its mind. measured over two resolutions: grayscale
+	// shifts on nearly every pixel, a hard threshold almost never, and the
+	// three noisy modes sit between — random a little cheaper than dither
+	// because it leaves longer runs of bare clay in the light tones.
+	const MOVES_PER_PX = { grayscale: 1, threshold: 0.2, dither: 0.5, scatter: 0.5, random: 0.45 };
+
 	function laserSig() {
 		const l = project.laser;
-		return [l.mode, l.brightness, l.contrast, l.gamma, l.invert, l.threshold, l.inLo, l.inHi, cache.k].join('|');
+		return [l.mode, l.brightness, l.contrast, l.gamma, l.invert, l.threshold,
+			l.inLo, l.inHi, l.noise, l.seed, cache.k].join('|');
 	}
 
 	// resample the source to roughly the size the wall is drawn at, then
@@ -190,13 +198,13 @@
 	// show through them. the stage draws every tile's scar out of one shared
 	// raster, so the word cannot be cut from it the way the exporter cuts it
 	// — filling the letters with the bare clay lands on the same picture.
-	function wordPatch(t, w, h, fill) {
+	function wordPatch(rect, w, h, fill) {
 		const g = Imaging.wordGeom(project.word, plan.wall);
 		if (!g || !(g.size > 0)) return null;
 		const c = Imaging.canvas(w, h);
 		const x = c.getContext('2d');
-		const sx = c.width / t.w, sy = c.height / t.h;   // on screen a tile has no bleed
-		x.setTransform(sx, 0, 0, sy, -t.x * sx, -t.y * sy);
+		const sx = c.width / rect.w, sy = c.height / rect.h;
+		x.setTransform(sx, 0, 0, sy, -rect.x * sx, -rect.y * sy);
 		x.font = `700 ${g.size}px ${g.face}`;
 		x.textAlign = 'center';
 		x.textBaseline = 'middle';
@@ -208,7 +216,66 @@
 		return c;
 	}
 
-	let layout = null;   // px-per-mm and origin of the last draw, for hit testing
+	let layout = null;   // the scale and the world of the last draw, for hit testing
+
+	// which of the cached rasters this view is looking at
+	function baseRaster() {
+		return view === 'source' ? cache.src
+			: view === 'laser' ? cache.laser
+				: project.sim.polarity === 'lighter' ? cache.inverted : cache.laser;
+	}
+
+	// one brick as it will come out: the clay, the scar the head leaves on it,
+	// and the word cut back out of that.
+	//
+	// `rect` is the piece of the wall being shown, in millimetres — the bare
+	// face on the wall, the whole engraved area on the bed, since the bed is
+	// showing what the beam covers and the beam covers the bleed too. `src` is
+	// the window into the source that matches it, `dest` where it lands.
+	function paintFace(ctx, rect, src, dest, clay) {
+		const k = cache.k, base = baseRaster(), d = dest;
+		if (!base) return;
+		if (!clay) {
+			ctx.fillStyle = '#fff';
+			ctx.fillRect(d.x, d.y, d.w, d.h);
+			ctx.drawImage(base, src.x * k, src.y * k, src.w * k, src.h * k, d.x, d.y, d.w, d.h);
+			return;
+		}
+		ctx.drawImage(clay, d.x, d.y, d.w, d.h);
+		if (project.sim.polarity === 'lighter') {
+			// the body is the black point and the scar only adds to it —
+			// nothing here may darken a brick. see claySimulate
+			ctx.globalAlpha = Imaging.SCAR_ALPHA;
+			ctx.drawImage(base, src.x * k, src.y * k, src.w * k, src.h * k, d.x, d.y, d.w, d.h);
+			ctx.globalAlpha = 1;
+			if (project.word.text.trim()) {
+				// cut out: the bare body back through the letters.
+				// burnt: the letters at full scar instead.
+				const cut = project.word.mode !== 'burn';
+				const patch = wordPatch(rect, Math.max(2, Math.round(d.w)), Math.max(2, Math.round(d.h)),
+					cut ? clay : scarSwatch());
+				if (patch) {
+					ctx.globalAlpha = cut ? 1 : Imaging.SCAR_ALPHA;
+					ctx.drawImage(patch, d.x, d.y, d.w, d.h);
+				}
+			}
+		} else {
+			ctx.globalCompositeOperation = 'multiply';
+			ctx.drawImage(base, src.x * k, src.y * k, src.w * k, src.h * k, d.x, d.y, d.w, d.h);
+		}
+		ctx.globalCompositeOperation = 'source-over';
+		ctx.globalAlpha = 1;
+	}
+
+	function label(ctx, text, cx, cy, size) {
+		ctx.font = `${size}px ui-monospace, monospace`;
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		ctx.fillStyle = 'rgba(0,0,0,0.55)';
+		ctx.fillText(text, cx + 1, cy + 1);
+		ctx.fillStyle = 'rgba(255,255,255,0.92)';
+		ctx.fillText(text, cx, cy);
+	}
 
 	function draw() {
 		const cv = $('stage'), ctx = cv.getContext('2d');
@@ -219,15 +286,32 @@
 		const availH = Math.max(200, wrap.clientHeight - 36);
 		const dpr = Math.min(devicePixelRatio || 1, 2);
 
-		let s = Math.min(availW / plan.wall.w, availH / plan.wall.h);
-		const cssW = plan.wall.w * s, cssH = plan.wall.h * s;
+		// the bed is a world of its own: the machine's square, in machine
+		// millimetres, Y counting up from its corner. if the work has been
+		// asked to go past the bed the canvas grows to show that it has.
+		const bed = view === 'bed' ? Bed.layout(project, plan) : null;
+		const world = bed
+			? {
+				w: Math.max(bed.bed.w, bed.used ? bed.used.maxX + bed.margin : 0),
+				h: Math.max(bed.bed.h, bed.used ? bed.used.maxY + bed.margin : 0)
+			}
+			: { w: plan.wall.w, h: plan.wall.h };
+
+		const s = Math.min(availW / world.w, availH / world.h);
+		const cssW = world.w * s, cssH = world.h * s;
 		cv.style.width = cssW + 'px';
 		cv.style.height = cssH + 'px';
 		cv.width = Math.round(cssW * dpr);
 		cv.height = Math.round(cssH * dpr);
 		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-		layout = { s };
+		layout = { s, world, bed, dpr };
 
+		ensurePreview(s * dpr);
+		if (bed) drawBed(ctx, bed, s, cssW, cssH, dpr);
+		else drawWall(ctx, s, cssW, cssH, dpr);
+	}
+
+	function drawWall(ctx, s, cssW, cssH, dpr) {
 		// mortar
 		ctx.fillStyle = view === 'source' ? '#2a2724' : darkBody() ? '#5c554f' : '#9c948a';
 		ctx.fillRect(0, 0, cssW, cssH);
@@ -240,84 +324,155 @@
 			return;
 		}
 
-		ensurePreview(s * dpr);
-		const k = cache.k;
-		const base = view === 'source' ? cache.src
-			: view === 'laser' ? cache.laser
-				: project.sim.polarity === 'lighter' ? cache.inverted : cache.laser;
 		const pool = clayPool(plan.wall.face.w * s * dpr, plan.wall.face.h * s * dpr);
 		const labels = $('showLabels').checked;
 		const joints = $('showGrid').checked;
+		const sim = view === 'simulation' || view === 'status';
+		const bedSet = new Set(project.bed.ids);
 
 		for (const t of plan.list) {
-			const dx = t.x * s, dy = t.y * s, dw = t.w * s, dh = t.h * s;
+			const dest = { x: t.x * s, y: t.y * s, w: t.w * s, h: t.h * s };
 			// the crop without bleed: on screen a brick shows its own face
-			const sx = t.src.x + (t.out.bleed / t.out.w) * t.src.w;
-			const sy = t.src.y + (t.out.bleed / t.out.h) * t.src.h;
-			const sw = (t.w / t.out.w) * t.src.w, sh = (t.h / t.out.h) * t.src.h;
-
-			if (view === 'simulation' || view === 'status') {
-				const clay = pool[(t.row * 7 + t.col * 3) % pool.length];
-				ctx.drawImage(clay, dx, dy, dw, dh);
-				if (project.sim.polarity === 'lighter') {
-					// the body is the black point and the scar only adds to
-					// it — nothing here may darken a brick. see claySimulate
-					ctx.globalAlpha = Imaging.SCAR_ALPHA;
-					ctx.drawImage(base, sx * k, sy * k, sw * k, sh * k, dx, dy, dw, dh);
-					ctx.globalAlpha = 1;
-					if (project.word.text.trim()) {
-						// cut out: the bare body back through the letters.
-						// burnt: the letters at full scar instead.
-						const cut = project.word.mode !== 'burn';
-						const patch = wordPatch(t, Math.max(2, Math.round(dw)), Math.max(2, Math.round(dh)),
-							cut ? clay : scarSwatch());
-						if (patch) {
-							ctx.globalAlpha = cut ? 1 : Imaging.SCAR_ALPHA;
-							ctx.drawImage(patch, dx, dy, dw, dh);
-						}
-					}
-				} else {
-					ctx.globalCompositeOperation = 'multiply';
-					ctx.drawImage(base, sx * k, sy * k, sw * k, sh * k, dx, dy, dw, dh);
-				}
-				ctx.globalCompositeOperation = 'source-over';
-				ctx.globalAlpha = 1;
-			} else {
-				ctx.fillStyle = '#fff';
-				ctx.fillRect(dx, dy, dw, dh);
-				ctx.drawImage(base, sx * k, sy * k, sw * k, sh * k, dx, dy, dw, dh);
-			}
+			const src = {
+				x: t.src.x + (t.out.bleed / t.out.w) * t.src.w,
+				y: t.src.y + (t.out.bleed / t.out.h) * t.src.h,
+				w: (t.w / t.out.w) * t.src.w, h: (t.h / t.out.h) * t.src.h
+			};
+			const clay = sim ? pool[(t.row * 7 + t.col * 3) % pool.length] : null;
+			paintFace(ctx, { x: t.x, y: t.y, w: t.w, h: t.h }, src, dest, clay);
 
 			if (view === 'status') {
 				const st = (project.tiles[t.id] || {}).status || 'pending';
 				ctx.fillStyle = STATUS_COLOR[st];
 				ctx.globalAlpha = st === 'pending' ? 0.35 : 0.72;
-				ctx.fillRect(dx, dy, dw, dh);
+				ctx.fillRect(dest.x, dest.y, dest.w, dest.h);
 				ctx.globalAlpha = 1;
 			}
 
 			if (joints) {
 				ctx.strokeStyle = darkBody() ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.35)';
 				ctx.lineWidth = 1;
-				ctx.strokeRect(dx + 0.5, dy + 0.5, dw - 1, dh - 1);
+				ctx.strokeRect(dest.x + 0.5, dest.y + 0.5, dest.w - 1, dest.h - 1);
 			}
 
-			if (labels && dw > 30 && dh > 11) {
-				const size = Math.min(dh * 0.42, dw * 0.19, 15);
-				ctx.font = `${size}px ui-monospace, monospace`;
-				ctx.textAlign = 'center';
-				ctx.textBaseline = 'middle';
-				ctx.fillStyle = 'rgba(0,0,0,0.55)';
-				ctx.fillText(t.label, dx + dw / 2 + 1, dy + dh / 2 + 1);
-				ctx.fillStyle = 'rgba(255,255,255,0.92)';
-				ctx.fillText(t.label, dx + dw / 2, dy + dh / 2);
+			if (labels && dest.w > 30 && dest.h > 11) {
+				label(ctx, t.label, dest.x + dest.w / 2, dest.y + dest.h / 2,
+					Math.min(dest.h * 0.42, dest.w * 0.19, 15));
 			}
 
 			if (t.id === selected) {
 				ctx.strokeStyle = '#e08a4e';
 				ctx.lineWidth = 2;
-				ctx.strokeRect(dx + 1, dy + 1, dw - 2, dh - 2);
+				ctx.strokeRect(dest.x + 1, dest.y + 1, dest.w - 2, dest.h - 2);
 			}
+
+			// on the machine right now: the handful the joint file is written
+			// for. drawn on every view, because it is the one thing about a
+			// brick that is true whatever you are looking at — and inside the
+			// selection ring, so a brick that is both still says both.
+			if (bedSet.has(t.id)) {
+				ctx.save();
+				ctx.setLineDash([4, 3]);
+				ctx.strokeStyle = 'rgba(240,236,230,0.95)';
+				ctx.lineWidth = 2;
+				ctx.strokeRect(dest.x + 3.5, dest.y + 3.5, dest.w - 7, dest.h - 7);
+				ctx.restore();
+			}
+		}
+	}
+
+	// the machine's square with the bricks that are on it, drawn the way the
+	// machine counts: X to the right, Y up, origin at the near corner. this is
+	// the picture the joint gcode describes, and the point of it is to be able
+	// to see, before sending anything, that the head stays on the bricks.
+	function drawBed(ctx, bed, s, cssW, cssH, dpr) {
+		const Y = mm => cssH - mm * s;                    // the bed counts up
+		const rect = (x, y, w, h) => [x * s, Y(y + h), w * s, h * s];
+
+		// anything outside the machine's own square is not somewhere the head
+		// can be sent, so it is not drawn as bed
+		ctx.fillStyle = '#171614';
+		ctx.fillRect(0, 0, cssW, cssH);
+		ctx.fillStyle = '#26231f';
+		ctx.fillRect(...rect(0, 0, bed.bed.w, bed.bed.h));
+		ctx.strokeStyle = '#4a453f';
+		ctx.lineWidth = 1;
+		ctx.strokeRect(...rect(0, 0, bed.bed.w, bed.bed.h).map((v, i) => i < 2 ? v + 0.5 : v - 1));
+
+		// the inset the first face is laid to
+		if (bed.margin > 0) {
+			ctx.save();
+			ctx.setLineDash([3, 4]);
+			ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+			ctx.strokeRect(...rect(bed.margin, bed.margin,
+				Math.max(0, bed.bed.w - bed.margin * 2), Math.max(0, bed.bed.h - bed.margin * 2)));
+			ctx.restore();
+		}
+
+		if (!bed.slots.length) {
+			ctx.fillStyle = '#5a544d';
+			ctx.font = '13px monospace';
+			ctx.textAlign = 'center';
+			ctx.fillText('shift-click bricks on the wall to put them on the bed', cssW / 2, cssH / 2);
+			return;
+		}
+
+		const pool = clayPool(bed.cell.w * s * dpr, bed.cell.h * s * dpr);
+		const labels = $('showLabels').checked;
+
+		for (const sl of bed.slots) {
+			const t = sl.tile;
+			const d = { x: sl.x * s, y: Y(sl.y + sl.h), w: sl.w * s, h: sl.h * s };
+			// on the bed a face is shown whole, bleed and all: the bleed is
+			// burnt, and what is burnt is what has to fit
+			const wallRect = { x: t.x - t.out.bleed, y: t.y - t.out.bleed, w: t.out.w, h: t.out.h };
+			const clay = pool[(t.row * 7 + t.col * 3) % pool.length];
+			if (!img) { ctx.fillStyle = '#3a3633'; ctx.fillRect(d.x, d.y, d.w, d.h); }
+			else if (!sl.turn) paintFace(ctx, wallRect, t.src, d, clay);
+			else {
+				// laid on its side. the frame it is painted into is turned
+				// rather than the picture, so what the stage shows is exactly
+				// what Gcode.quarterTurn will put on the brick — anticlockwise,
+				// the top of the picture down the left-hand edge.
+				ctx.save();
+				ctx.translate(d.x, d.y + d.h);
+				ctx.rotate(-Math.PI / 2);
+				paintFace(ctx, wallRect, t.src, { x: 0, y: 0, w: d.h, h: d.w }, clay);
+				ctx.restore();
+			}
+
+			// the brick edge inside the engraved area — the bleed hangs off it
+			if (t.out.bleed > 0) {
+				ctx.save();
+				ctx.setLineDash([2, 3]);
+				ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+				ctx.lineWidth = 1;
+				ctx.strokeRect(...rect(sl.x + t.out.bleed, sl.y + t.out.bleed,
+					sl.turn ? t.h : t.w, sl.turn ? t.w : t.h));
+				ctx.restore();
+			}
+
+			// a face the machine cannot reach is called out as such
+			const off = bed.origin.x + sl.x + sl.w > bed.bed.w || bed.origin.y + sl.y + sl.h > bed.bed.h
+				|| bed.origin.x + sl.x < 0 || bed.origin.y + sl.y < 0;
+			ctx.strokeStyle = off ? '#c0563e' : t.id === selected ? '#e08a4e' : 'rgba(230,224,216,0.55)';
+			ctx.lineWidth = off || t.id === selected ? 2 : 1;
+			ctx.strokeRect(d.x + 1, d.y + 1, d.w - 2, d.h - 2);
+
+			if (labels && d.w > 34 && d.h > 12) {
+				label(ctx, `${sl.n}· ${sl.label}`, d.x + d.w / 2, d.y + d.h / 2,
+					Math.min(d.h * 0.4, d.w * 0.15, 14));
+			}
+		}
+
+		// what the head is told to walk before the beam comes on
+		if (bed.frame && bed.used) {
+			ctx.save();
+			ctx.setLineDash([6, 4]);
+			ctx.strokeStyle = 'rgba(192,122,82,0.85)';
+			ctx.lineWidth = 1;
+			ctx.strokeRect(...rect(bed.used.minX, bed.used.minY, bed.used.w, bed.used.h));
+			ctx.restore();
 		}
 	}
 
@@ -325,7 +480,114 @@
 		const cv = $('stage'), r = cv.getBoundingClientRect();
 		if (!layout || !plan) return null;
 		const mx = (clientX - r.left) / layout.s, my = (clientY - r.top) / layout.s;
+		if (layout.bed) {
+			const y = layout.world.h - my;               // back into machine millimetres
+			const sl = layout.bed.slots.find(s => mx >= s.x && mx <= s.x + s.w && y >= s.y && y <= s.y + s.h);
+			return sl ? sl.tile : null;
+		}
 		return plan.list.find(t => mx >= t.x && mx <= t.x + t.w && my >= t.y && my <= t.y + t.h) || null;
+	}
+
+	// ---------------------------------------------------------------
+	// the bed
+	// ---------------------------------------------------------------
+	// a wall is metres across and the machine reaches 410 mm, so the wall is
+	// never cut as a wall. these are the few bricks that are lying on the
+	// machine at this moment, and they are the ones the joint file is for.
+	const onBed = id => project.bed.ids.indexOf(id) >= 0;
+
+	function setBed(ids, why) {
+		project.bed.ids = ids;
+		if (why) Project.note(project, why);
+		save();
+		renderBed();
+		renderInspector();
+		draw();
+		if (why) updateLog();
+	}
+
+	function toggleBed(id) {
+		const ids = project.bed.ids.slice();
+		const at = ids.indexOf(id);
+		if (at < 0) ids.push(id); else ids.splice(at, 1);
+		setBed(ids);
+	}
+
+	function renderBed() {
+		if (!plan || !project) return;
+		const lay = Bed.layout(project, plan);
+		const n = lay.slots.length;
+		const box = $('bedList');
+
+		box.innerHTML = n ? lay.slots.map(s => {
+			// a face the head cannot reach, called out one by one rather than
+			// as a single "it does not fit"
+			const off = lay.origin.x + s.x + s.w > lay.bed.w || lay.origin.y + s.y + s.h > lay.bed.h
+				|| lay.origin.x + s.x < 0 || lay.origin.y + s.y < 0;
+			return `<div class="${off ? 'off' : ''}" data-id="${s.id}" title="${off ? 'past the edge of the work area' : 'show it'}">
+				<b>${s.n}</b><span>${s.label}</span>
+				<i>X${fmt(lay.origin.x + s.x)} Y${fmt(lay.origin.y + s.y)}</i>
+				<button data-off="${s.id}" title="take it off the bed">×</button>
+			</div>`;
+		}).join('') : '<div><i>nothing on the bed — shift-click the bricks that are on it</i></div>';
+
+		box.querySelectorAll('[data-off]').forEach(b => b.onclick = e => {
+			e.stopPropagation();
+			toggleBed(b.dataset.off);
+		});
+		box.querySelectorAll('div[data-id]').forEach(d => d.onclick = () => selectTile(d.dataset.id));
+
+		const hint = $('bedHint');
+		if (!n) {
+			hint.className = 'hint';
+			hint.textContent = `the bed holds ${lay.per || 0} of this face${lay.turn ? ' turned' : ''} at a time` +
+				(lay.per ? `, ${lay.cols} across × ${lay.rows} deep.` : ' — the face is bigger than the work area.');
+		} else if (lay.fits) {
+			hint.className = 'hint';
+			hint.textContent = `${n} brick${n === 1 ? '' : 's'}${lay.turn ? ', turned a quarter turn' : ''} ` +
+				`— the work is ${fmt(lay.used.w)} × ${fmt(lay.used.h)} mm ` +
+				`of ${fmt(lay.bed.w)} × ${fmt(lay.bed.h)}, and ${lay.why}. ` +
+				`nothing in the file goes outside it. the bed holds ${lay.per}${lay.turn ? ' turned' : ''}.`;
+		} else {
+			hint.className = 'hint bad';
+			hint.textContent = `${n} brick${n === 1 ? '' : 's'} will not fit: ${lay.why}. ` +
+				`take some off, or make the joint between them smaller.`;
+		}
+		$('bedGcode').disabled = !n || !lay.fits || !img;
+		$('bedGcode').textContent = n
+			? `one gcode for ${n} brick${n === 1 ? '' : 's'}`
+			: 'one gcode for these bricks';
+	}
+
+	// the whole bed as a single file. the head is walked round the work first,
+	// then burns one face at a time; between the faces it jumps, it does not
+	// scan — see Gcode.sheet.
+	async function exportBed() {
+		if (!img) return toast('load a source image first');
+		const lay = Bed.layout(project, plan);
+		if (!lay.slots.length) return toast('put some bricks on the bed first');
+		if (!lay.fits) return toast(lay.why);
+
+		busy(true, 'rasterising…', 0);
+		try {
+			const out = await Bed.build(project, img, plan, null, {
+				onProgress: (i, k, l) => busy(true, `${l} — ${i}/${k}`, k ? i / k : 0)
+			});
+			const names = out.lay.slots.map(s => s.label);
+			const tag = names.length <= 4 ? names.join('+') : `${names[0]}+${names.length - 1}`;
+			const safe = project.name.replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '') || 'wall';
+			AE.download(new Blob([out.text], { type: 'text/plain' }),
+				`${safe}-bed-${tag}.${AE.Gcode.EXT}`);
+			Project.note(project, `one file for ${names.length} brick${names.length === 1 ? '' : 's'}: ` +
+				`${names.join(' ')} — ${AE.Gcode.clock(out.stats.seconds)} at speed`);
+			save(true); updateLog();
+			toast(`${names.length} bricks · ${(out.text.length / 1048576).toFixed(1)} MB · ~${AE.Gcode.clock(out.stats.seconds)}`);
+		} catch (e) {
+			console.error(e);
+			toast('that file could not be written: ' + e.message);
+		} finally {
+			busy(false);
+		}
 	}
 
 	// ---------------------------------------------------------------
@@ -336,6 +598,25 @@
 		const f = plan.wall.face;
 		const dpi = project.laser.dpi;
 		const px = { w: Tiling.mmToPx(f.w, dpi), h: Tiling.mmToPx(f.h, dpi) };
+
+		if (view === 'bed') {
+			const lay = Bed.layout(project, plan);
+			const b = [`work area <b>${fmt(lay.bed.w)} × ${fmt(lay.bed.h)} mm</b> · holds <b>${lay.per}</b> ` +
+				`of this face${lay.turn ? ' <b>turned</b>' : ''}`];
+			if (lay.slots.length) {
+				b.push(`on it <b>${lay.slots.length}</b> · the head keeps to ` +
+					`<b class="${lay.fits ? '' : 'bad'}">X${fmt(lay.reach.minX)}–${fmt(lay.reach.maxX)} ` +
+					`Y${fmt(lay.reach.minY)}–${fmt(lay.reach.maxY)}</b>` +
+					(lay.overscan ? ` · run-up <b>${fmt(lay.overscan)} mm</b>` : ''));
+				b.push(`the work <b>${fmt(lay.used.w)} × ${fmt(lay.used.h)} mm</b>`);
+				if (!lay.fits) b.push(`<span class="bad">${lay.why}</span>`);
+			} else {
+				b.push('shift-click a brick on the wall to put it on the bed');
+			}
+			$('stageFoot').innerHTML = b.map(x => `<span>${x}</span>`).join('');
+			return;
+		}
+
 		const bits = [
 			`wall <b>${fmt(plan.wall.w)} × ${fmt(plan.wall.h)} mm</b> · ${(plan.wall.w / 1000).toFixed(2)} × ${(plan.wall.h / 1000).toFixed(2)} m`,
 			`face <b>${fmt(f.w)} × ${fmt(f.h)} mm</b> → ${px.w} × ${px.h} px`,
@@ -402,8 +683,9 @@
 			<label>operator <input type="text" id="inspOperator" value="${(r.operator || '').replace(/"/g, '&quot;')}"></label>
 			<label>passes / power <input type="text" id="inspPasses" value="${(r.passes || '').replace(/"/g, '&quot;')}"></label>
 			<label>notes <textarea id="inspNotes">${r.notes || ''}</textarea></label>
+			<button id="inspBed" class="wide">${onBed(t.id) ? 'take it off the bed' : 'put it on the bed'}</button>
 			<button id="inspDownload" class="wide">download this brick</button>
-			<p class="hint">keys: e engraved · q queued · f failed · s skipped · p pending · arrows move</p>`;
+			<p class="hint">keys: e engraved · q queued · f failed · s skipped · p pending · b on the bed · arrows move</p>`;
 
 		body.querySelectorAll('.chip').forEach(c => c.onclick = () => {
 			Project.setStatus(project, t.id, c.dataset.status, t.label);
@@ -417,6 +699,7 @@
 		field('inspPasses', 'passes');
 		field('inspNotes', 'notes');
 		$('inspDownload').onclick = () => downloadOne(t);
+		$('inspBed').onclick = () => toggleBed(t.id);
 
 		// the thumbnail is cut from the original at full quality, so what it
 		// shows is exactly what the file will contain
@@ -516,6 +799,7 @@
 		const scope = $('exportScope').value;
 		if (scope === 'all') return null;
 		if (scope === 'one') return selected ? [selected] : [];
+		if (scope === 'bed') return project.bed.ids.slice();
 		const want = scope === 'todo'
 			? id => (Project.rec(project, id).status !== 'engraved')
 			: id => (Project.rec(project, id).status === 'queued');
@@ -580,6 +864,10 @@
 			.map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
 		$('bodyTone').innerHTML = Object.entries(Imaging.BODIES)
 			.map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
+		$('bedArrange').innerHTML = Object.entries(Bed.ARRANGE)
+			.map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+		$('bedTurn').innerHTML = Object.entries(Bed.TURN)
+			.map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
 		$('ledgerStatus').innerHTML = '<option value="">every status</option>' +
 			Project.STATUSES.map(s => `<option value="${s}">${s}</option>`).join('');
 	}
@@ -608,6 +896,8 @@
 		dpiSel.value = String(p.laser.dpi);
 		$('mode').value = p.laser.mode;
 		$('threshold').value = p.laser.threshold;
+		$('noise').value = p.laser.noise;
+		$('seed').value = p.laser.seed;
 		$('brightness').value = p.laser.brightness;
 		$('contrast').value = p.laser.contrast;
 		$('gamma').value = Math.round(p.laser.gamma * 100);
@@ -632,6 +922,13 @@
 		$('wordY').value = p.word.y;
 		$('polarity').value = p.sim.polarity;
 		$('bodyTone').value = p.sim.body;
+		$('bedW').value = p.bed.w;
+		$('bedH').value = p.bed.h;
+		$('bedArrange').value = p.bed.arrange;
+		$('bedTurn').value = p.bed.turn;
+		$('bedMargin').value = p.bed.margin;
+		$('bedGap').value = p.bed.gap;
+		$('bedFrame').checked = !!p.bed.frame;
 		syncOutputs();
 	}
 
@@ -649,8 +946,18 @@
 			? `set ${fmt(wg.size)} mm tall, ${p.word.mode === 'burn' ? 'burnt over' : 'cut out of'} the picture` +
 			  ` — it runs across the bricks, not inside one.`
 			: 'the ware\u2019s name, laid across the whole wall.';
+		$('noiseV').value = p.laser.noise + '%';
+		// random decides every pixel against the cut, so it wants the cut shown
+		const m = p.laser.mode;
 		document.querySelectorAll('.thresholdOnly').forEach(el =>
-			el.style.display = p.laser.mode === 'threshold' ? '' : 'none');
+			el.style.display = (m === 'threshold' || m === 'random') ? '' : 'none');
+		document.querySelectorAll('.noiseOnly').forEach(el =>
+			el.style.display = (m === 'random' || m === 'scatter') ? '' : 'none');
+		$('noiseHint').textContent = m === 'random'
+			? 'every pixel decided on its own against a cut that wanders — grain and no pattern at all, ' +
+			'and the heaviest file of the five since the power changes constantly along a scanline.'
+			: 'the weave broken up. the error is still carried forward, so the tone stays exactly as ' +
+			'honest as plain dither. at grain 0% this is plain dither, and random is a bare threshold.';
 
 		// how much of the available bleach the picture actually asks for.
 		// a plate left unfitted can sit at a few percent and read as a haze,
@@ -691,7 +998,7 @@
 		// stores without compressing, so say so before the browser finds out.
 		const px = Tiling.mmToPx(f.w + 2 * (p.laser.bleed || 0), p.laser.dpi) *
 			Tiling.mmToPx(f.h + 2 * (p.laser.bleed || 0), p.laser.dpi);
-		const perBrick = px * (p.laser.mode === 'grayscale' ? 1 : p.laser.mode === 'threshold' ? 0.2 : 0.5) * 10.5;
+		const perBrick = px * (MOVES_PER_PX[p.laser.mode] == null ? 0.5 : MOVES_PER_PX[p.laser.mode]) * 10.5;
 		const wall = perBrick * p.grid.cols * p.grid.rows;
 		const size = b => b > 1e9 ? (b / 1073741824).toFixed(2) + ' GB' : (b / 1048576).toFixed(0) + ' MB';
 		note.push(`roughly ${size(perBrick)} of gcode a brick, ${size(wall)} for the wall${p.laser.mode === 'grayscale' ? ' — grayscale shifts power almost every pixel; dither is far smaller' : ''}.`);
@@ -721,6 +1028,8 @@
 		p.laser.dpi = Math.round(num($('dpi').value, p.laser.dpi));
 		p.laser.mode = $('mode').value;
 		p.laser.threshold = Math.round(num($('threshold').value, p.laser.threshold));
+		p.laser.noise = Math.min(100, Math.max(0, Math.round(num($('noise').value, p.laser.noise))));
+		p.laser.seed = Math.min(99999, Math.max(1, Math.round(num($('seed').value, p.laser.seed))));
 		p.laser.brightness = Math.round(num($('brightness').value, p.laser.brightness));
 		p.laser.contrast = Math.round(num($('contrast').value, p.laser.contrast));
 		p.laser.gamma = num($('gamma').value, p.laser.gamma * 100) / 100;
@@ -745,6 +1054,13 @@
 		p.word.y = num($('wordY').value, p.word.y);
 		p.sim.polarity = $('polarity').value;
 		p.sim.body = $('bodyTone').value;
+		p.bed.w = Math.max(20, num($('bedW').value, p.bed.w));
+		p.bed.h = Math.max(20, num($('bedH').value, p.bed.h));
+		p.bed.arrange = $('bedArrange').value;
+		p.bed.turn = $('bedTurn').value;
+		p.bed.margin = Math.max(0, num($('bedMargin').value, p.bed.margin));
+		p.bed.gap = Math.max(0, num($('bedGap').value, p.bed.gap));
+		p.bed.frame = $('bedFrame').checked;
 		syncOutputs();
 		save();
 		refresh();
@@ -759,12 +1075,18 @@
 		// keeps the geometry honest until a picture arrives
 		plan = Tiling.tiles(project, img || { width: 1, height: 1 });
 		Project.prune(project, plan);
+		// a brick taken off the wall cannot be on the machine
+		const live = new Set(plan.list.map(t => t.id));
+		if (project.bed.ids.some(id => !live.has(id))) {
+			project.bed.ids = project.bed.ids.filter(id => live.has(id));
+		}
 		syncOutputs();
 		if (selected && !plan.list.some(t => t.id === selected)) selected = null;
 		updateFoot();
 		updateTally();
 		renderLedger();
 		renderInspector();
+		renderBed();
 		draw();
 	}
 
@@ -814,10 +1136,12 @@
 	function bind() {
 		const controls = ['preset', 'bLength', 'bWidth', 'bHeight', 'face', 'cols', 'rows',
 			'gapX', 'gapY', 'fit', 'offsetX', 'offsetY', 'originRow', 'dpi', 'mode',
-			'threshold', 'brightness', 'contrast', 'gamma', 'fires', 'inLo', 'inHi', 'bleed', 'polarity', 'bodyTone',
+			'threshold', 'noise', 'seed', 'brightness', 'contrast', 'gamma', 'fires',
+			'inLo', 'inHi', 'bleed', 'polarity', 'bodyTone',
 			'wordText', 'wordMode', 'wordSize', 'wordX', 'wordY',
 			'gcFeed', 'gcPower', 'gcLaserMode', 'gcSMax', 'gcPasses', 'gcBidir',
-			'gcOverscan', 'gcOriginX', 'gcOriginY', 'gcAir'];
+			'gcOverscan', 'gcOriginX', 'gcOriginY', 'gcAir',
+			'bedW', 'bedH', 'bedArrange', 'bedTurn', 'bedMargin', 'bedGap', 'bedFrame'];
 		controls.forEach(id => {
 			const el = $(id);
 			el.addEventListener('input', () => {
@@ -843,6 +1167,29 @@
 
 		$('fitRange').onclick = () => fitRange(false);
 
+		// a different grain from the same picture. the seed is saved with the
+		// project, so the one you settle on is the one that gets cut.
+		$('reseed').onclick = () => {
+			project.laser.seed = 1 + Math.floor(Math.random() * 99999);
+			syncForm(); save(true); refresh();
+			toast('seed ' + project.laser.seed);
+		};
+
+		// the bed
+		$('bedAdd').onclick = () => {
+			if (!selected) return toast('click a brick first');
+			if (onBed(selected)) return toast('it is already on the bed');
+			toggleBed(selected);
+		};
+		$('bedQueued').onclick = () => {
+			const ids = plan.list.filter(t => Project.rec(project, t.id).status === 'queued').map(t => t.id);
+			if (!ids.length) return toast('nothing is queued');
+			setBed(ids, `the bed: ${ids.length} queued brick${ids.length === 1 ? '' : 's'}`);
+			toast(`${ids.length} on the bed`);
+		};
+		$('bedClear').onclick = () => setBed([]);
+		$('bedGcode').onclick = exportBed;
+
 		$('resetLaser').onclick = () => {
 			const d = Project.blank().laser;
 			Object.assign(project.laser, {
@@ -860,6 +1207,7 @@
 			view = b.dataset.view;
 			$('views').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
 			draw();
+			updateFoot();
 			renderInspector();
 		});
 		$('showLabels').onchange = draw;
@@ -880,10 +1228,19 @@
 			if (f && f.type.startsWith('image/')) useBlob(f, f.name);
 		});
 
-		// the wall
+		// the wall. a plain click reads a brick; shift — or cmd, for the hand
+		// that expects it — puts it on the machine, or takes it off again, so
+		// a bedful is picked out by running along a course with shift down.
 		$('stage').addEventListener('click', e => {
 			const t = tileAt(e.clientX, e.clientY);
-			if (t) selectTile(t.id);
+			if (!t) return;
+			if (e.shiftKey || e.metaKey || e.ctrlKey) {
+				selected = t.id;
+				toggleBed(t.id);
+				renderLedger();
+			} else {
+				selectTile(t.id);
+			}
 		});
 		// double click walks a brick straight to engraved and back
 		$('stage').addEventListener('dblclick', e => {
@@ -898,6 +1255,7 @@
 		addEventListener('keydown', e => {
 			if (!selected || !plan) return;
 			if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
+			if (e.key === 'b') { toggleBed(selected); e.preventDefault(); return; }
 			const map = { e: 'engraved', q: 'queued', f: 'failed', s: 'skipped', p: 'pending' };
 			if (map[e.key]) {
 				const t = plan.list.find(x => x.id === selected);

@@ -113,16 +113,24 @@
 						<option value="picture">the engraving — one picture over all the tops</option>
 					</select>
 				</label>
-				<div id="pictureRow" hidden>
-					<label>hand to der Brenner at <input type="range" id="hoPpmm" min="4" max="24" step="1">
+				<label>hand to der Brenner at <input type="range" id="hoPpmm" min="4" max="24" step="1">
 					<output id="hoPpmmV"></output>
 				</label>
 				<button id="exportFaces" class="wide">export the faces for der Brenner</button>
-				<p class="hint" id="hoHint">one png per face, black on white, with a manifest
-					saying which face of which brick each one is. der Brenner needs nothing
-					else — it never reads the volume. the burn cannot come out finer than
-					the resolution written here.</p>
-				<label>the picture comes from
+				<button id="exportPicked" class="wide primary" hidden>export the picked faces</button>
+				<div id="pickRow">
+					<p class="hint" id="pickHint">—</p>
+					<div class="picks" id="pickList"></div>
+					<button id="clearPicks" class="wide" hidden>let them all go</button>
+				</div>
+				<p class="hint" id="hoHint">one png per face, the brick as it will look —
+					white is where the engraving went, and der Brenner turns the lot round
+					on its way in, because black is what fires. a manifest says which face
+					of which brick each one is. der Brenner needs nothing else — it never
+					reads the volume. the burn cannot come out finer than the resolution
+					written here.</p>
+				<div id="pictureRow" hidden>
+					<label>the picture comes from
 						<select id="pictureProject"></select>
 					</label>
 					<p class="hint" id="pictureHint">—</p>
@@ -281,7 +289,7 @@
 					<output id="exPpmmV">24 px/mm</output>
 				</label>
 				<p class="hint" id="exSize">—</p>
-				<button id="exportFaces" class="wide primary">export the faces</button>
+				<button id="exportPngs" class="wide primary">export the faces</button>
 				<p class="hint">One png a printed side, at the size the brick actually is: a long face
 					is 196 × 45 mm, a small one 95 × 45, the bed 196 × 95. The top comes off with the
 					course that carries it — one to a stack, since every other bed in a yard is under a

@@ -175,6 +175,62 @@
 		return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
 	};
 
+	// ---------- comments ----------
+	// grbl reads one line at a time into a fixed buffer, and on the serial
+	// side of most builds that buffer is 128 bytes. a longer line is not
+	// merely a long line: it overflows, the controller errors on it, and
+	// since the header stands before the first move the job then does
+	// nothing at all — no frame, no burn, no complaint that means anything.
+	// no comment is worth that, so every one of them is folded to a width
+	// that cannot overflow anything.
+	//
+	// and folded in ASCII. an em dash is three bytes and a multiplication
+	// sign is two, so a header set in the desk's own typography runs half
+	// again as long as it looks; on a controller that counts bytes rather
+	// than characters that is the difference between a file that runs and a
+	// file that does not. the prose belongs on the screen. what goes down
+	// the wire is plain.
+	const ASCII = {
+		'—': '-', '–': '-', '×': 'x', '·': '-',
+		'…': '...', '°': 'deg', ' ': ' ',
+		'’': "'", '‘': "'", '“': '"', '”': '"'
+	};
+	// bremen is full of umlauts and the project names carry them, so the
+	// accents are stripped rather than turned into question marks
+	const plain = s => String(s)
+		.replace(/ß/g, 'ss')
+		.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+		.replace(/[^\x20-\x7e]/g, c => (ASCII[c] != null ? ASCII[c] : '?'));
+
+	const COMMENT_COLS = 70;
+	function fold(line) {
+		const body = plain(line).replace(/^;[ ]?/, '');
+		const indent = (body.match(/^[ \t]*/) || [''])[0];
+		const words = body.trim().split(/\s+/).filter(Boolean);
+		if (!words.length) return [';'];
+		const out = [];
+		let cur = '';
+		for (const w of words) {
+			const next = cur ? cur + ' ' + w : indent + w;
+			// a single word longer than the line is left whole: breaking a
+			// coordinate or a label costs more than the long line saves
+			if (cur && next.length + 2 > COMMENT_COLS) { out.push('; ' + cur); cur = indent + '  ' + w; }
+			else cur = next;
+		}
+		if (cur) out.push('; ' + cur);
+		return out;
+	}
+
+	// fold the comments in a list of lines and leave the moves alone
+	function folded(lines) {
+		const out = [];
+		for (const l of lines) {
+			if (l.charAt(0) === ';') { for (const f of fold(l)) out.push(f); }
+			else out.push(l);
+		}
+		return out;
+	}
+
 	// ---------- the file ----------
 	function wrap(r, o, meta) {
 		const prec = o.precision;
@@ -217,9 +273,10 @@
 			(o.overscan > 0 ? `, ${fmt(o.overscan, 2)} mm overscan` : ''),
 			b ? `; Bounds: X${fmt(q(b.minX, prec), prec)} Y${fmt(q(b.minY, prec), prec)} to X${fmt(q(b.maxX, prec), prec)} Y${fmt(q(b.maxY, prec), prec)}`
 				: '; Bounds: nothing to burn',
-			`; ${r.lines} lines, ${r.moves} moves, ~${clock(r.seconds)} at speed`,
-			'G00 G17 G40 G21 G54'
+			`; ${r.lines} lines, ${r.moves} moves, ~${clock(r.seconds)} at speed`
 		];
+		for (const n of (o.notes || [])) head.push(n.charAt(0) === ';' ? n : '; ' + n);
+		head.push('G00 G17 G40 G21 G54');
 		if (fr) {
 			const n = v => fmt(q(v, prec), prec);
 			head.push('; frame — the head walks the work before the beam is on');
@@ -241,10 +298,35 @@
 		if (o.park) tail.push('G0X' + fmt(q(parkX, prec), prec) + 'Y' + fmt(q(parkY, prec), prec));
 		tail.push('M2');
 
+		// the body is moves, ASCII and short by construction; only what was
+		// written as prose needs folding
+		const top = folded(head), bottom = folded(tail);
 		if (!r.ink) {
-			return head.concat(['; no ink on this face at these levels — nothing to burn'], tail).join('\n') + '\n';
+			return top.concat(folded(['; no ink on this face at these levels — nothing to burn']), bottom)
+				.join('\n') + '\n';
 		}
-		return head.concat(r.body, tail).join('\n') + '\n';
+		return top.concat(r.body, bottom).join('\n') + '\n';
+	}
+
+	// ---------- a quarter turn ----------
+	// a brick laid on its side on the bed wants its picture laid on its side
+	// too, or it comes off the machine turned. done on the bytes rather than
+	// through a canvas: at exactly ninety degrees this is a re-indexing and
+	// not a resampling, so not one pixel of a dithered face is touched — put
+	// the same raster through a canvas rotation and a smoothing pass would
+	// turn hard black and white into grays the head has no way to burn.
+	//
+	// anticlockwise: the top edge of the picture comes to lie down the
+	// left-hand side, and what was its right-hand edge points up the bed.
+	function quarterTurn(gray, w, h) {
+		const out = new Uint8ClampedArray(gray.length);
+		// the result is h wide and w tall, and out(X, Y) = in(w - 1 - Y, X)
+		for (let Y = 0; Y < w; Y++) {
+			const u = w - 1 - Y;
+			const row = Y * h;
+			for (let X = 0; X < h; X++) out[row + X] = gray[X * w + u];
+		}
+		return { gray: out, w: h, h: w };
 	}
 
 	// pull the gray channel back out of a processed canvas. Imaging.process
@@ -268,5 +350,78 @@
 		return { text: wrap(r, o, tileMM.meta), stats: r };
 	}
 
-	AE.Gcode = { EXT, DEFAULTS, raster, wrap, tile, fromCanvas, fmt, clock };
+	// ---------- several faces, one file ----------
+	// a bed with more than one brick on it.
+	//
+	// the machine cannot reach a whole wall. it can reach about four hundred
+	// millimetres square, so a wall is cut a few bricks at a time — and a few
+	// bricks laid out together want to be one job, not three files sent one
+	// after the other with the bed re-squared between them.
+	//
+	// each face is rastered on its own, at its own place on the bed, and the
+	// bodies are strung together in the order given. that is deliberate: a
+	// single raster spanning the whole bed would sweep every scanline across
+	// the ground between the bricks, and although nothing would be lit there
+	// the head would still travel it, at feedrate, for every line of the job.
+	// done this way the head finishes one face and jumps to the next, and the
+	// only rectangles it visits are the faces themselves.
+	//
+	// pieces: [{ canvas, w, h, x, y, label }] — w/h what the face measures in
+	// mm, x/y the bottom-left of it relative to the file's origin.
+	function sheet(pieces, meta, project, extra) {
+		const o = Object.assign({}, DEFAULTS, project.gcode, extra, {
+			binary: project.laser.mode !== 'grayscale'
+		});
+		const prec = o.precision;
+		const body = [];
+		const placed = [];
+		let lines = 0, moves = 0, burnMM = 0, darkMM = 0, rapidMM = 0, seconds = 0;
+		let bounds = null, pitchX = 0, pitchY = 0, prev = null;
+
+		for (const p of pieces) {
+			let { gray, w, h } = fromCanvas(p.canvas);
+			// p.w and p.h are what the face measures *as it lies*, so a turned
+			// face is handed over already swapped and the pitch comes out right
+			if (p.turn) ({ gray, w, h } = quarterTurn(gray, w, h));
+			const r = raster(gray, w, h, p.w, p.h, Object.assign({}, o, {
+				originX: o.originX + p.x, originY: o.originY + p.y
+			}));
+			pitchX = r.pitchX; pitchY = r.pitchY;
+
+			for (const line of fold(`; ${p.label} — bottom-left at X${fmt(q(o.originX + p.x, prec), prec)}` +
+				` Y${fmt(q(o.originY + p.y, prec), prec)}, ${fmt(p.w, 2)} × ${fmt(p.h, 2)} mm` +
+				(p.turn ? ', turned' : '') +
+				(r.ink ? '' : ' — nothing to burn at these levels'))) body.push(line);
+			for (const line of r.body) body.push(line);
+
+			lines += r.lines; moves += r.moves;
+			burnMM += r.burnMM; darkMM += r.darkMM; rapidMM += r.rapidMM;
+			seconds += r.seconds;
+
+			if (r.bounds) {
+				// the jump from the face before this one. raster() does not say
+				// where it left the head, so this is measured corner to corner:
+				// honest about the order, a little short on the distance.
+				if (prev) {
+					const d = Math.hypot(r.bounds.minX - prev.minX, r.bounds.minY - prev.minY);
+					rapidMM += d;
+					seconds += d / o.rapid * 60;
+				}
+				bounds = bounds ? {
+					minX: Math.min(bounds.minX, r.bounds.minX), minY: Math.min(bounds.minY, r.bounds.minY),
+					maxX: Math.max(bounds.maxX, r.bounds.maxX), maxY: Math.max(bounds.maxY, r.bounds.maxY)
+				} : Object.assign({}, r.bounds);
+				prev = r.bounds;
+			}
+			placed.push({ label: p.label, x: p.x, y: p.y, w: p.w, h: p.h, stats: r });
+		}
+
+		const all = {
+			body, lines, moves, ink: lines > 0, bounds,
+			burnMM, darkMM, rapidMM, seconds, pitchX, pitchY
+		};
+		return { text: wrap(all, o, meta), stats: all, placed };
+	}
+
+	AE.Gcode = { EXT, DEFAULTS, raster, wrap, tile, sheet, fromCanvas, quarterTurn, fold, plain, fmt, clock };
 })();

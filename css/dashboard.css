@@ -624,6 +624,60 @@ td.notes {
 	margin-top: 10px;
 }
 
+/* ---------------- the bed ---------------- */
+.bed-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin: 8px 0 0;
+	max-height: 190px;
+	overflow-y: auto;
+}
+
+.bed-list div {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+	padding: 2px 5px;
+	background: var(--panel-2);
+	font-size: 11px;
+}
+
+.bed-list div.off {
+	outline: 1px solid var(--failed);
+}
+
+.bed-list b {
+	color: var(--clay);
+	font-weight: 600;
+	min-width: 16px;
+	text-align: right;
+}
+
+.bed-list span {
+	flex: 1;
+	color: var(--ink);
+}
+
+.bed-list i {
+	color: var(--faint);
+	font-style: normal;
+}
+
+.bed-list button {
+	padding: 0 5px;
+	line-height: 1.4;
+	font-size: 11px;
+}
+
+.hint.warn {
+	color: var(--queued);
+}
+
+.hint.bad {
+	color: var(--failed);
+}
+
 .bundled-list {
 	display: flex;
 	flex-direction: column;

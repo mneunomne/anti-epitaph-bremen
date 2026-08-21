@@ -575,8 +575,12 @@
 			const files = e.target.files;
 			if (!files || !files.length) return;
 			try {
+				// the zip der Stapel writes, or the folder unpacked — either way
+				// what comes back is already the right way round: white on the
+				// brick is the engraving, and Handoff turns it into the black
+				// this page fires on
 				const got = await AE.Stapel.Handoff.read(files);
-				if (!got.items.length) return toast('the manifest listed no faces I could find');
+				if (!got.items.length) return toast('the bag listed no faces I could find');
 				taken = got;
 				// everything picked, since the file is already the selection
 				S.pick = {};
